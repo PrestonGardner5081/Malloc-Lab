@@ -25,7 +25,7 @@
  * uncomment the following line. Be sure not to have debugging enabled
  * in your final submission.
  */
-// #define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 /* When debugging is enabled, the underlying functions get called */
@@ -114,6 +114,10 @@ void* malloc(size_t size)
  */
 void free(void* ptr)
 {
+    void* tmp = mem_read(ptr,sizeof(void*));
+    
+    mem_write(ptr,tmp,wordSize);
+    
     /* IMPLEMENT THIS */
     return;
 }
