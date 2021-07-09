@@ -75,8 +75,11 @@ static bool is_allocated(uint64_t bound_tag){
     return bound_tag & 1;
 }
 
-static void add_node(void *ptr, size_t size, ){
-    
+static void add_node(void *ptr, void *next, void *prev, uint64_t size){
+    mem_write(ptr, (uint64_t)next, WORD_SIZE);
+    mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
+    mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
+    mem_write(ptr + size, size, WORD_SIZE);
 }
 
 /*
@@ -93,8 +96,10 @@ bool mm_init(void)
 
     //initialize root
     root = mem_heap_lo();
-    uint64_t first_node = (uint64_t)root + 2*WORD_SIZE;
-    mem_write(root, first_node, WORD_SIZE);
+    void *first_node = root + 2*WORD_SIZE;
+    mem_write(root, (uint64_t)first_node, WORD_SIZE);
+    //initialize first node
+    add_node(first_node, (void *)0, root, 16);
 
     printf("\nuse me to stop exec\n");//FIXME
     return true;
@@ -114,9 +119,9 @@ void* malloc(size_t size)
  */
 void free(void* ptr)
 {
-    void* tmp = mem_read(ptr,sizeof(void*));
+    // void* tmp = mem_read(ptr,sizeof(void*));
     
-    mem_write(ptr,tmp,wordSize);
+    // mem_write(ptr,tmp,wordSize);
     
     /* IMPLEMENT THIS */
     return;
