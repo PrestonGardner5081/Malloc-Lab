@@ -1,1 +1,2 @@
-# CMPSC_473
+# malloclab
+Carefully read malloclab.pdf in its entirety.
