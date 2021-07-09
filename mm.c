@@ -52,10 +52,13 @@
 #define ALIGNMENT 16
 // Overhead for allocated space
 #define ALLOC_BOUDARY_SIZE 16
-//ptr to last node in free list
-#define wordSize sizeof(void*)
+//word size
+#define WORD_SIZE sizeof(void*)
+//root pointer
+static void *root;
 //pointer to last pointer in list
-void *lastFree;
+static void *lastFree;
+
 
 
 /* rounds up to the nearest multiple of ALIGNMENT */
@@ -72,17 +75,28 @@ static bool is_allocated(uint64_t bound_tag){
     return bound_tag & 1;
 }
 
+static void add_node(void *ptr, size_t size, ){
+    
+}
+
 /*
  * Initialize: returns false on error, true on success.
  */
 bool mm_init(void)
 {
     /* IMPLEMENT THIS */
-    uint64_t rootInitAddr = 12345;
 
-    mem_sbrk(wordSize);
-    mem_write(mem_heap_lo, rootInitAddr, wordSize);
+    // adds enough space for root and one free block of size 2 * word size
+    mem_sbrk(WORD_SIZE * 5);
 
+    //initialize first node
+
+    //initialize root
+    root = mem_heap_lo();
+    uint64_t first_node = (uint64_t)root + 2*WORD_SIZE;
+    mem_write(root, first_node, WORD_SIZE);
+
+    printf("\nuse me to stop exec\n");//FIXME
     return true;
 }
 
