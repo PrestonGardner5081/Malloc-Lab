@@ -64,6 +64,14 @@ static size_t align(size_t x)
     return ALIGNMENT * ((x+ALIGNMENT-1)/ALIGNMENT);
 }
 
+static uint64_t tag_to_size(uint64_t bound_tag){
+    return bound_tag & -2;
+}
+
+static bool is_allocated(uint64_t bound_tag){
+    return bound_tag & 1;
+}
+
 /*
  * Initialize: returns false on error, true on success.
  */
