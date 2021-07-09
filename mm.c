@@ -75,6 +75,9 @@ static bool is_allocated(uint64_t bound_tag){
     return bound_tag & 1;
 }
 
+static void add_node(void *ptr, size_t size, ){
+    
+}
 
 /*
  * Initialize: returns false on error, true on success.
