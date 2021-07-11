@@ -69,6 +69,8 @@ struct free_node
     bool valid;
 };
 
+typedef struct free_node free_node; 
+
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x)
 {
@@ -83,8 +85,8 @@ static bool is_allocated(uint64_t bound_tag){
     return bound_tag & 1;
 }
 
-static struct free_node get_node(void *ptr){
-    struct free_node node;
+static free_node get_node(void *ptr){
+    free_node node;
     uint64_t lower_tag = mem_read(ptr - WORD_SIZE, WORD_SIZE);
     node.size = tag_to_size(lower_tag);
     uint64_t upper_tag = mem_read(ptr + node.size, WORD_SIZE);
@@ -123,7 +125,7 @@ bool mm_init(void)
     add_node(root, NULL, root_addr, WORD_SIZE * 2);
 
     //FIXME
-    struct free_node fNode = get_node(root);
+    free_node fNode = get_node(root);
     printf("size %ld\n", fNode.size);
     printf("prev %p\n", fNode.prev_addr);
     printf("next %p\n", fNode.next_addr);
