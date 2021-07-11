@@ -60,6 +60,7 @@ static void *root;
 static void *root_addr;
 //pointer to last pointer in list
 static void *lastFree;
+//May have to manually keep track of last byte
 
 struct free_node
 {
@@ -134,6 +135,60 @@ static void add_node(void *ptr, uint64_t size){
     mem_write(ptr + size, size, WORD_SIZE);
 }
 
+static void *add_space(uint64_t size){
+    void *ptr;
+    void *prg_break = mem_heap_hi() + 1;
+    uint64_t last_tag = mem_read(prg_break - WORD_SIZE, WORD_SIZE);
+
+    // printf("WORD_SIZE: %ld\n", WORD_SIZE);
+
+    if(is_allocated(last_tag)){
+        ptr = prg_break + WORD_SIZE;
+        mem_sbrk(size + 2 * WORD_SIZE);
+        add_node(ptr, size);
+    }
+    else{
+        uint64_t last_size = tag_to_size(last_tag);
+        ptr = prg_break - last_size - WORD_SIZE;
+        mem_sbrk(size-last_size);
+        //FIXME
+
+        free_node last_node = get_node(ptr-WORD_SIZE);
+        //FIXME
+        //update lower size tag
+        mem_write(ptr-WORD_SIZE, size, WORD_SIZE);
+        //update upper size tag
+        mem_write(prg_break-WORD_SIZE, size, WORD_SIZE);
+    }
+
+    return ptr;
+}
+
+static void set_next(void *ptr, void *next){
+    mem_write(ptr, (uint64_t)next, WORD_SIZE);
+}
+
+static void set_prev(void *ptr, void *prev){
+    mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
+}
+
+static void swap(void *ptr){
+    free_node node = get_node(ptr);
+    set_next(node.prev_addr, node.next_addr);
+    set_prev(node.next_addr, node.prev_addr);
+}
+
+static void alloc(void *space, uint64_t size){
+    free_node free_space = get_node(space);
+
+    // if(free_space.size == size){
+    //     free_node prev_node = get_node
+    //     if(free_space.next_addr != NULL){
+            
+    //     }
+    // }
+}
+
 /*
  * Initialize: returns false on error, true on success.
  */
@@ -170,7 +225,13 @@ bool mm_init(void)
     printf("next %p\n", nNode.next_addr);
     printf("valid %d\n", nNode.valid);
 
-    printf("ptr to free space %p\n", find_space(32));
+    mm_malloc(32);
+
+    nNode = get_node(root);
+    printf("size %ld\n", nNode.size);
+    printf("prev %p\n", nNode.prev_addr);
+    printf("next %p\n", nNode.next_addr);
+    printf("valid %d\n", nNode.valid);
     printf("\nuse me to stop exec\n");
     //FIXME
     
@@ -184,9 +245,17 @@ void *malloc(size_t size)
 {
     /* IMPLEMENT THIS */
     uint64_t corrected_size = (uint64_t)align(size); 
+    void *space = find_space(corrected_size);
+    if(space == NULL){
+        space = add_space(corrected_size);
+    }
+
+    alloc(space, corrected_size);
 
     //FIXME
+    printf("ptr to free space %p\n", space);
     printf("corrected_size: %ld", corrected_size);
+    printf("\nuse me to stop exec\n");
     //FIXME
 
     return NULL;
