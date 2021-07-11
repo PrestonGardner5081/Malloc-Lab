@@ -90,6 +90,7 @@ static free_node get_node(void *ptr){
     uint64_t lower_tag = mem_read(ptr - WORD_SIZE, WORD_SIZE);
     node.size = tag_to_size(lower_tag);
     uint64_t upper_tag = mem_read(ptr + node.size, WORD_SIZE);
+    //valid tells us if the node is a valid free node otherwise known as unallocated
     node.valid = !is_allocated(lower_tag) && !is_allocated(upper_tag);
     node.next_addr = (void *)mem_read(ptr, WORD_SIZE);
     node.prev_addr = (void *)mem_read(ptr + WORD_SIZE, WORD_SIZE);
