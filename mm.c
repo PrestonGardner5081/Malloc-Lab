@@ -121,7 +121,7 @@ void free(void* ptr)
 
 
     //case 1 insert a free space at the root of the list 
-    if(ptr->root){
+    
        
 
     void* tmp = mem_read(ptr,sizeof(void*));
@@ -129,8 +129,7 @@ void free(void* ptr)
     mem_write(ptr,tmp,WORD_SIZE);
     //next=tmp
     mem_write(ptr,tmp,NULL);
-    
-    }    
+      
     /* IMPLEMENT THIS */
     return;
 }
