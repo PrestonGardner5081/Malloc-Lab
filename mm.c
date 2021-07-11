@@ -156,8 +156,8 @@ bool mm_init(void)
     mem_write(first_node + size, size, WORD_SIZE);
 
     //FIXME
-    mem_sbrk(4 * WORD_SIZE);
-    add_node(root_addr + 6*WORD_SIZE, 2*WORD_SIZE);
+    mem_sbrk(6 * WORD_SIZE);
+    add_node(root_addr + 6*WORD_SIZE, 4*WORD_SIZE);
     
     free_node fNode = get_node(root_addr + 2 * WORD_SIZE);
     printf("size %ld\n", fNode.size);
