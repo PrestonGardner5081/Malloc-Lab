@@ -98,13 +98,39 @@ static free_node get_node(void *ptr){
     return node; 
 }
 
-static void add_node(void *ptr, void *next, void *prev, uint64_t size){
-    mem_write(ptr, (uint64_t)next, WORD_SIZE);
-    mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
-    mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
-    mem_write(ptr + size, size, WORD_SIZE);
+static void *find_space(uint64_t size){
+    void *ptr = root;
+    uint64_t cur_size = 0;
+
+    while(ptr != (void *)0){
+        free_node cur_node = get_node(ptr); 
+
+        if(cur_node.size >= size){
+            break;
+        }
+
+        ptr = cur_node.next_addr;
+    }
+
+    return ptr; 
 }
 
+static void add_node(void *ptr, uint64_t size){
+    void *next = root;
+    root = ptr;
+    //update actual root 
+    mem_write(root_addr, (uint64_t)root, WORD_SIZE);
+    //next node prev_addr = current node
+    mem_write(next + WORD_SIZE, (uint64_t)ptr, WORD_SIZE);
+    //current node next_addr = next node
+    mem_write(ptr, (uint64_t)next, WORD_SIZE);
+    //current node prev_addr = null
+    mem_write(ptr + WORD_SIZE, 0, WORD_SIZE);
+    //set size for lower tag
+    mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
+    //set size for upper size
+    mem_write(ptr + size, size, WORD_SIZE);
+}
 
 /*
  * Initialize: returns false on error, true on success.
@@ -116,21 +142,34 @@ bool mm_init(void)
     // adds enough space for root and one free block of size 2 * word size
     mem_sbrk(WORD_SIZE * 5);
 
-    //initialize first node
-
     //initialize root
     root_addr = mem_heap_lo();
-    root = root_addr + 2*WORD_SIZE;
+    uint64_t size = 2 * WORD_SIZE;
+    void *first_node = root_addr + size;
+    root = first_node;
     mem_write(root_addr, (uint64_t)root, WORD_SIZE);
     //initialize first node
-    add_node(root, NULL, root_addr, WORD_SIZE * 2);
+    mem_write(first_node, 0, WORD_SIZE);
+    mem_write(first_node + WORD_SIZE, 0, WORD_SIZE);
+    mem_write(first_node - WORD_SIZE, size, WORD_SIZE);
+    mem_write(first_node + size, size, WORD_SIZE);
 
     //FIXME
-    free_node fNode = get_node(root);
+    mem_sbrk(4 * WORD_SIZE);
+    add_node(root_addr + 6*WORD_SIZE, 2*WORD_SIZE);
+    
+    free_node fNode = get_node(root_addr + 2 * WORD_SIZE);
     printf("size %ld\n", fNode.size);
     printf("prev %p\n", fNode.prev_addr);
     printf("next %p\n", fNode.next_addr);
-    printf("valid %d\n", fNode.valid);
+    printf("valid %d\n\n", fNode.valid);
+    free_node nNode = get_node(root);
+    printf("size %ld\n", nNode.size);
+    printf("prev %p\n", nNode.prev_addr);
+    printf("next %p\n", nNode.next_addr);
+    printf("valid %d\n", nNode.valid);
+
+    printf("ptr to free space %p\n", find_space(32));
     printf("\nuse me to stop exec\n");
     //FIXME
     
@@ -143,6 +182,11 @@ bool mm_init(void)
 void* malloc(size_t size)
 {
     /* IMPLEMENT THIS */
+    uint64_t corrected_size = (uint64_t)align(size); 
+
+    //FIXME
+    printf("corrected_size: %ld", corrected_size);
+    //FIXME
 
     return NULL;
 }
