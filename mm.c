@@ -56,6 +56,8 @@
 #define WORD_SIZE sizeof(void *)
 //root pointer
 static void *root;
+//root pointer
+static void *root_addr;
 //pointer to last pointer in list
 static void *lastFree;
 
@@ -66,6 +68,8 @@ struct free_node
     uint64_t size;
     bool valid;
 };
+
+typedef struct free_node free_node; 
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x)
@@ -127,16 +131,16 @@ void *malloc(size_t size)
  */
 void free(void *ptr)
 {
-   struct free_node f;     
-                  
+   struct free_node f;        
    /*
     *Case 1 where a free node is added to the root of the list
     */
    //swapping the pointers 
-    
+
    // this is the size of the the node that needs to be freed
-    uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
-    add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
+   
+    //uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
+    //add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
 
     void *tmp = mem_read(ptr, sizeof(void *));
     root = ptr;
