@@ -66,11 +66,11 @@ static size_t align(size_t x)
 {
     return ALIGNMENT * ((x+ALIGNMENT-1)/ALIGNMENT);
 }
-
-static uint64_t tag_to_size(uint64_t bound_tag){
+//passes a boundary tag and returns the size i.e removes masked bit 
+static uint64_t tag_to_size(uint64_t bound_tag){     
     return bound_tag & -2;
 }
-
+//
 static bool is_allocated(uint64_t bound_tag){
     return bound_tag & 1;
 }
@@ -114,10 +114,23 @@ void* malloc(size_t size)
  */
 void free(void* ptr)
 {
+    void *next;
+    void *prev;
+    void *adj_next;
+    void *adj_prev;
+
+
+    //case 1 insert a free space at the root of the list 
+    if(ptr->root){
+       
+
     void* tmp = mem_read(ptr,sizeof(void*));
+    root=ptr;
+    mem_write(ptr,tmp,WORD_SIZE);
+    //next=tmp
+    mem_write(ptr,tmp,NULL);
     
-    mem_write(ptr,tmp,wordSize);
-    
+    }    
     /* IMPLEMENT THIS */
     return;
 }
