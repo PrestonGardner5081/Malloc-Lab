@@ -8,7 +8,7 @@
  * Also, read malloclab.pdf carefully and in its entirety before beginning.
  *
  */
-//  test puush 
+//  test puush
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,7 +53,7 @@
 // Overhead for allocated space
 #define ALLOC_BOUDARY_SIZE 16
 //word size
-#define WORD_SIZE sizeof(void*)
+#define WORD_SIZE sizeof(void *)
 //root pointer
 static void *root;
 //pointer to last pointer in list
@@ -63,32 +63,33 @@ struct free_node
 {
     void *next_addr;
     void *prev_addr;
-    uint64_t size;  
+    uint64_t size;
     bool valid;
 };
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x)
 {
-    return ALIGNMENT * ((x+ALIGNMENT-1)/ALIGNMENT);
+    return ALIGNMENT * ((x + ALIGNMENT - 1) / ALIGNMENT);
 }
-//passes a boundary tag and returns the size i.e removes masked bit 
-static uint64_t tag_to_size(uint64_t bound_tag){     
+//passes a boundary tag and returns the size i.e removes masked bit
+static uint64_t tag_to_size(uint64_t bound_tag)
+{
     return bound_tag & -2;
 }
-//
-static bool is_allocated(uint64_t bound_tag){
+//passes a boundary tag and returns the TRUE if it is allocated and FALSE if its free 
+static bool is_allocated(uint64_t bound_tag)
+{
     return bound_tag & 1;
 }
 
-static void add_node(void *ptr, void *next, void *prev, uint64_t size){
+static void add_node(void *ptr, void *next, void *prev, uint64_t size)
+{
     mem_write(ptr, (uint64_t)next, WORD_SIZE);
     mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
     mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
     mem_write(ptr + size, size, WORD_SIZE);
 }
-
-
 
 /*
  * Initialize: returns false on error, true on success.
@@ -96,27 +97,25 @@ static void add_node(void *ptr, void *next, void *prev, uint64_t size){
 bool mm_init(void)
 {
     /* IMPLEMENT THIS */
-
     // adds enough space for root and one free block of size 2 * word size
     mem_sbrk(WORD_SIZE * 5);
-
     //initialize first node
 
     //initialize root
     root = mem_heap_lo();
-    void *first_node = root + 2*WORD_SIZE;
+    void *first_node = root + 2 * WORD_SIZE;
     mem_write(root, (uint64_t)first_node, WORD_SIZE);
     //initialize first node
     add_node(first_node, NULL, root, WORD_SIZE * 2);
 
-    printf("\nuse me to stop exec\n");//FIXME
+    printf("\nuse me to stop exec\n"); //FIXME
     return true;
 }
 
 /*
  * malloc
  */
-void* malloc(size_t size)
+void *malloc(size_t size)
 {
     /* IMPLEMENT THIS */
 
@@ -126,20 +125,25 @@ void* malloc(size_t size)
 /*
  * free
  */
-void free(void* ptr)
+void free(void *ptr)
 {
-    // void* tmp = mem_read(ptr,sizeof(void*));
+   struct free_node f;     
+                  
+   /*
+    *Case 1 where a free node is added to the root of the list
+    */
+   //swapping the pointers 
     
-    // mem_write(ptr,tmp,wordSize);
-    
-       
+   // this is the size of the the node that needs to be freed
+    uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
+    add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
 
-    void* tmp = mem_read(ptr,sizeof(void*));
-    root=ptr;
-    mem_write(ptr,tmp,WORD_SIZE);
+    void *tmp = mem_read(ptr, sizeof(void *));
+    root = ptr;
+    mem_write(ptr, tmp, WORD_SIZE);
     //next=tmp
-    mem_write(ptr,tmp,NULL);
-      
+    mem_write(ptr, tmp, NULL);
+
     /* IMPLEMENT THIS */
     return;
 }
@@ -147,7 +151,7 @@ void free(void* ptr)
 /*
  * realloc
  */
-void* realloc(void* oldptr, size_t size)
+void *realloc(void *oldptr, size_t size)
 {
     /* IMPLEMENT THIS */
     return NULL;
@@ -157,12 +161,13 @@ void* realloc(void* oldptr, size_t size)
  * calloc
  * This function is not tested by mdriver, and has been implemented for you.
  */
-void* calloc(size_t nmemb, size_t size)
+void *calloc(size_t nmemb, size_t size)
 {
-    void* ptr;
+    void *ptr;
     size *= nmemb;
     ptr = malloc(size);
-    if (ptr) {
+    if (ptr)
+    {
         memset(ptr, 0, size);
     }
     return ptr;
@@ -172,7 +177,7 @@ void* calloc(size_t nmemb, size_t size)
  * Returns whether the pointer is in the heap.
  * May be useful for debugging.
  */
-static bool in_heap(const void* p)
+static bool in_heap(const void *p)
 {
     return p <= mem_heap_hi() && p >= mem_heap_lo();
 }
@@ -181,9 +186,9 @@ static bool in_heap(const void* p)
  * Returns whether the pointer is aligned.
  * May be useful for debugging.
  */
-static bool aligned(const void* p)
+static bool aligned(const void *p)
 {
-    size_t ip = (size_t) p;
+    size_t ip = (size_t)p;
     return align(ip) == ip;
 }
 
