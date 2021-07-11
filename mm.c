@@ -54,8 +54,10 @@
 #define ALLOC_BOUDARY_SIZE 16
 //word size
 #define WORD_SIZE sizeof(void*)
-//root pointer
+//address in root
 static void *root;
+//root pointer
+static void *root_addr;
 //pointer to last pointer in list
 static void *lastFree;
 
@@ -81,13 +83,24 @@ static bool is_allocated(uint64_t bound_tag){
     return bound_tag & 1;
 }
 
+static struct free_node get_node(void *ptr){
+    struct free_node node;
+    uint64_t lower_tag = mem_read(ptr - WORD_SIZE, WORD_SIZE);
+    node.size = tag_to_size(lower_tag);
+    uint64_t upper_tag = mem_read(ptr + node.size, WORD_SIZE);
+    node.valid = !is_allocated(lower_tag) && !is_allocated(upper_tag);
+    node.next_addr = (void *)mem_read(ptr, WORD_SIZE);
+    node.prev_addr = (void *)mem_read(ptr + WORD_SIZE, WORD_SIZE);
+
+    return node; 
+}
+
 static void add_node(void *ptr, void *next, void *prev, uint64_t size){
     mem_write(ptr, (uint64_t)next, WORD_SIZE);
     mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
     mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
     mem_write(ptr + size, size, WORD_SIZE);
 }
-
 
 
 /*
@@ -103,13 +116,21 @@ bool mm_init(void)
     //initialize first node
 
     //initialize root
-    root = mem_heap_lo();
-    void *first_node = root + 2*WORD_SIZE;
-    mem_write(root, (uint64_t)first_node, WORD_SIZE);
+    root_addr = mem_heap_lo();
+    root = root_addr + 2*WORD_SIZE;
+    mem_write(root_addr, (uint64_t)root, WORD_SIZE);
     //initialize first node
-    add_node(first_node, NULL, root, WORD_SIZE * 2);
+    add_node(root, NULL, root_addr, WORD_SIZE * 2);
 
-    printf("\nuse me to stop exec\n");//FIXME
+    //FIXME
+    struct free_node fNode = get_node(root);
+    printf("size %ld\n", fNode.size);
+    printf("prev %p\n", fNode.prev_addr);
+    printf("next %p\n", fNode.next_addr);
+    printf("valid %d\n", fNode.valid);
+    printf("\nuse me to stop exec\n");
+    //FIXME
+    
     return true;
 }
 
