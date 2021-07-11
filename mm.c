@@ -59,7 +59,13 @@ static void *root;
 //pointer to last pointer in list
 static void *lastFree;
 
-
+struct free_node
+{
+    void *next_addr;
+    void *prev_addr;
+    uint64_t size;  
+    bool valid;
+};
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x)
@@ -82,6 +88,8 @@ static void add_node(void *ptr, void *next, void *prev, uint64_t size){
     mem_write(ptr + size, size, WORD_SIZE);
 }
 
+
+
 /*
  * Initialize: returns false on error, true on success.
  */
@@ -99,7 +107,7 @@ bool mm_init(void)
     void *first_node = root + 2*WORD_SIZE;
     mem_write(root, (uint64_t)first_node, WORD_SIZE);
     //initialize first node
-    add_node(first_node, (void *)0, root, 16);
+    add_node(first_node, NULL, root, WORD_SIZE * 2);
 
     printf("\nuse me to stop exec\n");//FIXME
     return true;
@@ -111,6 +119,7 @@ bool mm_init(void)
 void* malloc(size_t size)
 {
     /* IMPLEMENT THIS */
+
     return NULL;
 }
 
