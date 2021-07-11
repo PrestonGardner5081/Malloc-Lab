@@ -86,15 +86,33 @@ static bool is_allocated(uint64_t bound_tag)
 {
     return bound_tag & 1;
 }
-
-static void add_node(void *ptr, void *next, void *prev, uint64_t size)
+//adds a new node also gives us the address of the next node
+static void add_node(void *ptr, uint64_t size)
 {
+    void*next =root;
+    root=ptr;
+    mem_write(root,(uint64_t)root,WORD_SIZE);
+    mem_write(next+WORD_SIZE,ptr, WORD_SIZE);
     mem_write(ptr, (uint64_t)next, WORD_SIZE);
-    mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
+    mem_write(ptr + WORD_SIZE,0 , WORD_SIZE);
     mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
     mem_write(ptr + size, size, WORD_SIZE);
-}
 
+
+}
+//Returns size, next, prev and valid (0 if free and 1 if allocated)
+static free_node get_node(void *ptr){
+    free_node node;
+    uint64_t lower_tag = mem_read(ptr - WORD_SIZE, WORD_SIZE);
+    node.size = tag_to_size(lower_tag);
+    uint64_t upper_tag = mem_read(ptr + node.size, WORD_SIZE);
+    //valid tells us if the node is a valid free node otherwise known as unallocated
+    node.valid = !is_allocated(lower_tag) && !is_allocated(upper_tag);
+    node.next_addr = (void *)mem_read(ptr, WORD_SIZE);
+    node.prev_addr = (void *)mem_read(ptr + WORD_SIZE, WORD_SIZE);
+
+    return node; 
+}
 /*
  * Initialize: returns false on error, true on success.
  */
@@ -131,13 +149,28 @@ void *malloc(size_t size)
  */
 void free(void *ptr)
 {
-   struct free_node f;        
-   /*
-    *Case 1 where a free node is added to the root of the list
-    */
-   //swapping the pointers 
+    //case 1
+    free_node fnode =get_node(ptr);
+    if(fnode.valid == 1){
+        void* next =root;                           //assiging value of root to next  
+        root=ptr;                                   //pointing root to the current free node 
+        //add node 
+         mem_write(root_addr,(uint64_t)root,WORD_SIZE);   //changing the address root stores
+        mem_write(root+WORD_SIZE,ptr, WORD_SIZE);
+        mem_write(ptr, (uint64_t)next, WORD_SIZE);
+        mem_write(ptr + WORD_SIZE,0 , WORD_SIZE);
+        mem_write(ptr - WORD_SIZE, fnode.size, WORD_SIZE);
+        mem_write(ptr + fnode.size, fnode.size, WORD_SIZE);
+    }
+   //case
 
-   // this is the size of the the node that needs to be freed
+    free_node node2= get_node(ptr);
+    if(node2.valid==1){
+        
+
+    }
+   
+   
    
     //uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
     //add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
