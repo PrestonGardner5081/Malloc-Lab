@@ -197,22 +197,22 @@ void *malloc(size_t size)
  */
 void free(void *ptr)
 {
-   struct free_node f;     
+//    struct free_node f;     
                   
-   /*
-    *Case 1 where a free node is added to the root of the list
-    */
-   //swapping the pointers 
+//    /*
+//     *Case 1 where a free node is added to the root of the list
+//     */
+//    //swapping the pointers 
     
-   // this is the size of the the node that needs to be freed
-    uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
-    add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
+//    // this is the size of the the node that needs to be freed
+//     uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
+//     add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
 
-    void *tmp = mem_read(ptr, sizeof(void *));
-    root = ptr;
-    mem_write(ptr, tmp, WORD_SIZE);
-    //next=tmp
-    mem_write(ptr, tmp, NULL);
+//     void *tmp = mem_read(ptr, sizeof(void *));
+//     root = ptr;
+//     mem_write(ptr, tmp, WORD_SIZE);
+//     //next=tmp
+//     mem_write(ptr, tmp, NULL);
 
     /* IMPLEMENT THIS */
     return;
