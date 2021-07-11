@@ -91,7 +91,7 @@ static void add_node(void *ptr, uint64_t size)
 {
     void*next =root;
     root=ptr;
-    mem_write(root,(uint64_t)root,WORD_SIZE);
+    mem_write(root_addr,(uint64_t)root,WORD_SIZE);
     mem_write(next+WORD_SIZE,ptr, WORD_SIZE);
     mem_write(ptr, (uint64_t)next, WORD_SIZE);
     mem_write(ptr + WORD_SIZE,0 , WORD_SIZE);
@@ -128,7 +128,7 @@ bool mm_init(void)
     void *first_node = root + 2 * WORD_SIZE;
     mem_write(root, (uint64_t)first_node, WORD_SIZE);
     //initialize first node
-    add_node(first_node, NULL, root, WORD_SIZE * 2);
+    add_node(first_node, WORD_SIZE * 2);
 
     printf("\nuse me to stop exec\n"); //FIXME
     return true;
@@ -140,6 +140,11 @@ bool mm_init(void)
 void *malloc(size_t size)
 {
     /* IMPLEMENT THIS */
+    uint64_t corrected_size = (uint64_t)align(size); 
+
+    //FIXME
+    printf("corrected_size: %ld", corrected_size);
+    //FIXME
 
     return NULL;
 }
@@ -163,6 +168,8 @@ void free(void *ptr)
         mem_write(ptr + fnode.size, fnode.size, WORD_SIZE);
     }
    //case
+    void* adj_next;
+    void* adj_prev;
 
     free_node node2= get_node(ptr);
     if(node2.valid==1){
