@@ -249,6 +249,32 @@ static void print_node_list(){
         ptr = cur_node.next_addr;
     }
 }
+void coalesce(void *ptr)
+{
+
+    free_node curr = get_node(ptr);
+    void *nextptr = (ptr + curr.size + 2 * WORD_SIZE);
+    void *prevptr = (ptr - (curr.size + 2 * WORD_SIZE));
+    printf("next ptr %p\n",nextptr);
+    printf("prev ptr %p\n",prevptr);
+    while (curr.next_addr == NULL)
+    {
+        if (get_node(ptr).valid && get_node(nextptr).valid)
+        {
+            curr.size += (get_node(nextptr).size + 2 * WORD_SIZE);
+        }
+        if (get_node(ptr).valid && get_node(prevptr).valid)
+        { //IF THINGS GO WRONG FIX THIS BY remvoving//get_node(ptr).valid
+            curr.size += (get_node(prevptr).size + 2 * WORD_SIZE);
+        }
+        if (get_node(ptr).valid && get_node(nextptr).valid && get_node(prevptr).valid)
+        {
+            curr.size += (get_node(nextptr).size + get_node(prevptr).size + 2 * WORD_SIZE);
+        }
+
+        //set_next(ptr, curr.next_addr);
+    }
+}
 
 /*
  * Initialize: returns false on error, true on success.
