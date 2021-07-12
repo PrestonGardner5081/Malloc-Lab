@@ -336,24 +336,38 @@ void *malloc(size_t size)
  */
 void free(void *ptr)
 {
-   struct free_node f;     
-                  
-   /*
-    *Case 1 where a free node is added to the root of the list
-    */
-   //swapping the pointers 
-    
-   // this is the size of the the node that needs to be freed
-    uint64_t size_to_delete = tag_to_size(mem_read(ptr-WORD_SIZE,WORD_SIZE));
-    add_node(ptr,f.next_addr,f.prev_addr,size_to_delete);
+    free_node fnode = get_node(ptr);
+    free_node node_n = get_node(ptr + fnode.size + 2 * WORD_SIZE);
+    free_node node_p = get_node(ptr - (fnode.size + 2 * WORD_SIZE));
 
-    void *tmp = mem_read(ptr, sizeof(void *));
-    root = ptr;
-    mem_write(ptr, tmp, WORD_SIZE);
-    //next=tmp
-    mem_write(ptr, tmp, NULL);
+    //case 1
 
-    /* IMPLEMENT THIS */
+    if (fnode.valid)
+    {
+        add_node(ptr, fnode.size);
+    }
+    //case 4
+    else if (node_p.valid && node_n.valid)
+    {
+        add_node(ptr, fnode.size);
+        splice(ptr + fnode.size + 2 * WORD_SIZE);
+        splice(ptr - (fnode.size + 2 * WORD_SIZE));
+        coalesce(ptr);
+    }
+    //case 2
+    else if (node_n.valid)
+    {
+        add_node(ptr, fnode.size);
+        splice(ptr + fnode.size + 2 * WORD_SIZE);
+        coalesce(ptr);
+    }
+    //case 3
+    else if (node_p.valid)
+    {
+        add_node(ptr, fnode.size);
+        splice(ptr - (fnode.size + 2 * WORD_SIZE));
+        coalesce(ptr);
+    }
     return;
 }
 
