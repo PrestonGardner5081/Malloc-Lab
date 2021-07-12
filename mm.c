@@ -151,10 +151,6 @@ static void *add_space(uint64_t size){
         uint64_t last_size = tag_to_size(last_tag);
         ptr = prg_break - last_size - WORD_SIZE;
         mem_sbrk(size-last_size);
-        //FIXME
-
-        free_node last_node = get_node(ptr-WORD_SIZE);
-        //FIXME
         //update lower size tag
         mem_write(ptr-WORD_SIZE, size, WORD_SIZE);
         //update upper size tag
@@ -172,21 +168,69 @@ static void set_prev(void *ptr, void *prev){
     mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
 }
 
-static void swap(void *ptr){
+static void splice(void *ptr){
     free_node node = get_node(ptr);
     set_next(node.prev_addr, node.next_addr);
     set_prev(node.next_addr, node.prev_addr);
 }
 
+static void set_bound_tags(void *ptr, uint64_t size, bool free){
+    uint64_t tag = size;
+    if(!free){
+        tag = size | 1; 
+    }
+    mem_write(ptr - WORD_SIZE, tag, WORD_SIZE);
+    mem_write(ptr + size, tag, WORD_SIZE);
+}
+
+static void add_space_root(){
+    void *new_node = mem_heap_hi() + 1 + WORD_SIZE;
+    mem_sbrk(4*WORD_SIZE);
+    set_next(new_node, NULL);
+    set_prev(new_node, NULL);
+    set_bound_tags(new_node, 2*WORD_SIZE, true);
+    root = new_node;
+    mem_write(root_addr, (uint64_t)root, WORD_SIZE);
+    // FIXME
+    free_node test_f = get_node(new_node);     
+    printf("\nuse me to stop exec\n");
+    // FIXME
+}
+
 static void alloc(void *space, uint64_t size){
     free_node free_space = get_node(space);
+    uint64_t new_node_size = free_space.size - size - WORD_SIZE; 
 
-    // if(free_space.size == size){
-    //     free_node prev_node = get_node
-    //     if(free_space.next_addr != NULL){
-            
-    //     }
-    // }
+    if(free_space.size == size || new_node_size < 2*WORD_SIZE){
+        if(free_space.prev_addr == NULL){
+            add_space_root();
+        }
+        else if(free_space.next_addr != NULL){
+            splice(space);
+        }
+        else{
+            set_next(free_space.prev_addr, NULL);
+        }
+        set_bound_tags(space, size, false);
+
+        // FIXME
+        free_node test_a = get_node(space);     
+        printf("\nuse me to stop exec\n");
+        // FIXME
+    }
+    else{
+        void *new_free = space + size + 2 * WORD_SIZE;
+        set_next(new_free, free_space.next_addr);
+        set_prev(new_free, free_space.prev_addr);
+        set_bound_tags(space, size, false);
+        set_bound_tags(new_free, new_node_size, true);
+
+        //FIXME
+        free_node test_new = get_node(new_free);
+        free_node test_a = get_node(space);
+        printf("\nuse me to stop exec\n");
+        //FIXME
+    }
 }
 
 /*
@@ -196,29 +240,22 @@ bool mm_init(void)
 {
     /* IMPLEMENT THIS */
     // adds enough space for root and one free block of size 2 * word size
-    mem_sbrk(WORD_SIZE * 5);
+    mem_sbrk(WORD_SIZE);
 
     //initialize root
     root_addr = mem_heap_lo();
-    uint64_t size = 2 * WORD_SIZE;
-    void *first_node = root_addr + size;
-    root = first_node;
-    mem_write(root_addr, (uint64_t)root, WORD_SIZE);
     //initialize first node
-    mem_write(first_node, 0, WORD_SIZE);
-    mem_write(first_node + WORD_SIZE, 0, WORD_SIZE);
-    mem_write(first_node - WORD_SIZE, size, WORD_SIZE);
-    mem_write(first_node + size, size, WORD_SIZE);
+    add_space_root();
 
     //FIXME
-    mem_sbrk(6 * WORD_SIZE);
-    add_node(root_addr + 6*WORD_SIZE, 4*WORD_SIZE);
+    // mem_sbrk(6 * WORD_SIZE);
+    // add_node(root_addr + 6*WORD_SIZE, 8*WORD_SIZE);
     
-    free_node fNode = get_node(root_addr + 2 * WORD_SIZE);
-    printf("size %ld\n", fNode.size);
-    printf("prev %p\n", fNode.prev_addr);
-    printf("next %p\n", fNode.next_addr);
-    printf("valid %d\n\n", fNode.valid);
+    // free_node fNode = get_node(root_addr + 2 * WORD_SIZE);
+    // printf("size %ld\n", fNode.size);
+    // printf("prev %p\n", fNode.prev_addr);
+    // printf("next %p\n", fNode.next_addr);
+    // printf("valid %d\n\n", fNode.valid);
     free_node nNode = get_node(root);
     printf("size %ld\n", nNode.size);
     printf("prev %p\n", nNode.prev_addr);
