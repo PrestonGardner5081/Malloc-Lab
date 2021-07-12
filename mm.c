@@ -255,8 +255,8 @@ void coalesce(void *ptr)
     free_node curr = get_node(ptr);
     void *nextptr = (ptr + curr.size + 2 * WORD_SIZE);
     void *prevptr = (ptr - (curr.size + 2 * WORD_SIZE));
-    printf("next ptr %p\n",nextptr);
-    printf("prev ptr %p\n",prevptr);
+    // printf("next ptr %p\n",nextptr);
+    // printf("prev ptr %p\n",prevptr);
     while (curr.next_addr == NULL)
     {
         if (get_node(ptr).valid && get_node(nextptr).valid)
@@ -336,39 +336,39 @@ void *malloc(size_t size)
  */
 void free(void *ptr)
 {
-    free_node fnode = get_node(ptr);
-    free_node node_n = get_node(ptr + fnode.size + 2 * WORD_SIZE);
-    free_node node_p = get_node(ptr - (fnode.size + 2 * WORD_SIZE));
+    // if(ptr==NULL){return;}
+    // free_node fnode = get_node(ptr);
+    // free_node node_n = get_node(ptr + fnode.size + 2 * WORD_SIZE);
+    // free_node node_p = get_node(ptr - (fnode.size + 2 * WORD_SIZE));
 
-    //case 1
-
-    if (fnode.valid)
-    {
-        add_node(ptr, fnode.size);
-    }
-    //case 4
-    else if (node_p.valid && node_n.valid)
-    {
-        add_node(ptr, fnode.size);
-        splice(ptr + fnode.size + 2 * WORD_SIZE);
-        splice(ptr - (fnode.size + 2 * WORD_SIZE));
-        coalesce(ptr);
-    }
-    //case 2
-    else if (node_n.valid)
-    {
-        add_node(ptr, fnode.size);
-        splice(ptr + fnode.size + 2 * WORD_SIZE);
-        coalesce(ptr);
-    }
-    //case 3
-    else if (node_p.valid)
-    {
-        add_node(ptr, fnode.size);
-        splice(ptr - (fnode.size + 2 * WORD_SIZE));
-        coalesce(ptr);
-    }
-    return;
+    // //case 1
+    // if (fnode.valid)
+    // {
+    //     add_node(ptr, fnode.size);
+    // }
+    // //case 4
+    // else if (node_p.valid && node_n.valid)
+    // {
+    //     add_node(ptr, fnode.size);
+    //     splice(ptr + fnode.size + 2 * WORD_SIZE);
+    //     splice(ptr - (fnode.size + 2 * WORD_SIZE));
+    //     coalesce(ptr);
+    // }
+    // //case 2
+    // else if (node_n.valid)
+    // {
+    //     add_node(ptr, fnode.size);
+    //     splice(ptr + fnode.size + 2 * WORD_SIZE);
+    //     coalesce(ptr);
+    // }
+    // //case 3
+    // else if (node_p.valid)
+    // {
+    //     add_node(ptr, fnode.size);
+    //     splice(ptr - (fnode.size + 2 * WORD_SIZE));
+    //     coalesce(ptr);
+    // }
+    
 }
 
 /*
@@ -376,7 +376,30 @@ void free(void *ptr)
  */
 void *realloc(void *oldptr, size_t size)
 {
-    /* IMPLEMENT THIS */
+    // uint64_t corrected_size = (uint64_t)align(size);
+    // free_node node=get_node(oldptr);
+    // if(node.size==corrected_size){return oldptr;}
+    // if(oldptr==NULL){return malloc(corrected_size);}
+    // if(corrected_size==0 ){ free(oldptr); return NULL;}
+    // //increase
+    // if(node.size< corrected_size){
+    //     void *newptr=malloc(corrected_size);
+    //     memcpy(newptr,oldptr,node.size);
+    //     free(oldptr);
+    //     return newptr;
+    // }
+    // //decrease
+    // else
+    
+    // if((node.size-corrected_size)<4*node.size){ return oldptr;}
+    // else{
+    //     uint64_t free_size= (node.size-corrected_size-2*WORD_SIZE);
+    //     void* free_ptr=(oldptr+corrected_size+2*WORD_SIZE);
+    //     set_bound_tags(free_ptr,free_size,true);
+    //     set_bound_tags(oldptr, corrected_size, false);
+    //     free(free_ptr);
+    //     return oldptr;
+    // }
     return NULL;
 }
 
