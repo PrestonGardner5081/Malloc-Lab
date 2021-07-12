@@ -60,6 +60,7 @@ static void *root;
 static void *root_addr;
 //pointer to last pointer in list
 static void *lastFree;
+//May have to manually keep track of last byte
 
 struct free_node
 {
@@ -144,22 +145,122 @@ void coalesce(void *ptr)
         //set_next(ptr, curr.next_addr);
     }
 }
-static void set_next(void *ptr, void *next)
-{
+
+static void *add_space(uint64_t size){
+    void *ptr;
+    void *prg_break = mem_heap_hi() + 1;
+    uint64_t last_tag = mem_read(prg_break - WORD_SIZE, WORD_SIZE);
+
+    // printf("WORD_SIZE: %ld\n", WORD_SIZE);
+
+    if(is_allocated(last_tag)){
+        ptr = prg_break + WORD_SIZE;
+        mem_sbrk(size + 2 * WORD_SIZE);
+        add_node(ptr, size);
+    }
+    else{
+        uint64_t last_size = tag_to_size(last_tag);
+        ptr = prg_break - last_size - WORD_SIZE;
+        mem_sbrk(size-last_size);
+        //update lower size tag
+        mem_write(ptr-WORD_SIZE, size, WORD_SIZE);
+        //update upper size tag
+        mem_write(prg_break-WORD_SIZE, size, WORD_SIZE);
+    }
+
+    return ptr;
+}
+
+static void set_next(void *ptr, void *next){
     mem_write(ptr, (uint64_t)next, WORD_SIZE);
 }
 
-static void set_prev(void *ptr, void *prev)
-{
+static void set_prev(void *ptr, void *prev){
     mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
 }
 
-static void splice(void *ptr)
-{
+static void splice(void *ptr){
     free_node node = get_node(ptr);
     set_next(node.prev_addr, node.next_addr);
     set_prev(node.next_addr, node.prev_addr);
 }
+
+static void set_bound_tags(void *ptr, uint64_t size, bool free){
+    uint64_t tag = size;
+    if(!free){
+        tag = size | 1; 
+    }
+    mem_write(ptr - WORD_SIZE, tag, WORD_SIZE);
+    mem_write(ptr + size, tag, WORD_SIZE);
+}
+static void *find_space(uint64_t size){
+    void *ptr = root;
+    uint64_t cur_size = 0;
+
+    while(ptr != (void *)0){
+        free_node cur_node = get_node(ptr); 
+
+        if(cur_node.size >= size){
+            break;
+        }
+
+        ptr = cur_node.next_addr;
+    }
+
+    return ptr; 
+}
+
+
+static void add_space_root(){
+    void *new_node = mem_heap_hi() + 1 + WORD_SIZE;
+    mem_sbrk(4*WORD_SIZE);
+    set_next(new_node, NULL);
+    set_prev(new_node, NULL);
+    set_bound_tags(new_node, 2*WORD_SIZE, true);
+    root = new_node;
+    mem_write(root_addr, (uint64_t)root, WORD_SIZE);
+    // FIXME
+    free_node test_f = get_node(new_node);     
+    printf("\nuse me to stop exec\n");
+    // FIXME
+}
+
+static void alloc(void *space, uint64_t size){
+    free_node free_space = get_node(space);
+    uint64_t new_node_size = free_space.size - size - WORD_SIZE; 
+
+    if(free_space.size == size || new_node_size < 2*WORD_SIZE){
+        if(free_space.prev_addr == NULL){
+            add_space_root();
+        }
+        else if(free_space.next_addr != NULL){
+            splice(space);
+        }
+        else{
+            set_next(free_space.prev_addr, NULL);
+        }
+        set_bound_tags(space, size, false);
+
+        // FIXME
+        free_node test_a = get_node(space);     
+        printf("\nuse me to stop exec\n");
+        // FIXME
+    }
+    else{
+        void *new_free = space + size + 2 * WORD_SIZE;
+        set_next(new_free, free_space.next_addr);
+        set_prev(new_free, free_space.prev_addr);
+        set_bound_tags(space, size, false);
+        set_bound_tags(new_free, new_node_size, true);
+
+        //FIXME
+        free_node test_new = get_node(new_free);
+        free_node test_a = get_node(space);
+        printf("\nuse me to stop exec\n");
+        //FIXME
+    }
+}
+
 /*
  * Initialize: returns false on error, true on success.
  */
@@ -167,17 +268,38 @@ bool mm_init(void)
 {
     /* IMPLEMENT THIS */
     // adds enough space for root and one free block of size 2 * word size
-    mem_sbrk(WORD_SIZE * 5);
-    //initialize first node
+    mem_sbrk(WORD_SIZE);
 
     //initialize root
-    root = mem_heap_lo();
-    void *first_node = root + 2 * WORD_SIZE;
-    mem_write(root, (uint64_t)first_node, WORD_SIZE);
+    root_addr = mem_heap_lo();
     //initialize first node
-    add_node(first_node, WORD_SIZE * 2);
+    add_space_root();
 
-    printf("\nuse me to stop exec\n"); //FIXME
+    //FIXME
+    // mem_sbrk(6 * WORD_SIZE);
+    // add_node(root_addr + 6*WORD_SIZE, 8*WORD_SIZE);
+    
+    // free_node fNode = get_node(root_addr + 2 * WORD_SIZE);
+    // printf("size %ld\n", fNode.size);
+    // printf("prev %p\n", fNode.prev_addr);
+    // printf("next %p\n", fNode.next_addr);
+    // printf("valid %d\n\n", fNode.valid);
+    free_node nNode = get_node(root);
+    printf("size %ld\n", nNode.size);
+    printf("prev %p\n", nNode.prev_addr);
+    printf("next %p\n", nNode.next_addr);
+    printf("valid %d\n", nNode.valid);
+
+    mm_malloc(32);
+
+    nNode = get_node(root);
+    printf("size %ld\n", nNode.size);
+    printf("prev %p\n", nNode.prev_addr);
+    printf("next %p\n", nNode.next_addr);
+    printf("valid %d\n", nNode.valid);
+    printf("\nuse me to stop exec\n");
+    //FIXME
+    
     return true;
 }
 
@@ -187,13 +309,23 @@ bool mm_init(void)
 void *malloc(size_t size)
 {
     /* IMPLEMENT THIS */
-    uint64_t corrected_size = (uint64_t)align(size);
+    if(size=0){return NULL;}
+    if(mem_sbrk()==-1) {return NULL;}
+    uint64_t corrected_size = (uint64_t)align(size); 
+    void *space = find_space(corrected_size);
+    if(space == NULL){
+        space = add_space(corrected_size);
+    }
+
+    alloc(space, corrected_size);
 
     //FIXME
+    printf("ptr to free space %p\n", space);
     printf("corrected_size: %ld", corrected_size);
+    printf("\nuse me to stop exec\n");
     //FIXME
 
-    return NULL;
+    return;
 }
 
 /*
@@ -201,12 +333,12 @@ void *malloc(size_t size)
  */
 void free(void *ptr)
 {
+    if(ptr=NULL){return;}
     free_node fnode = get_node(ptr);
     free_node node_n = get_node(ptr + fnode.size + 2 * WORD_SIZE);
     free_node node_p = get_node(ptr - (fnode.size + 2 * WORD_SIZE));
 
     //case 1
-
     if (fnode.valid)
     {
         add_node(ptr, fnode.size);
@@ -233,7 +365,7 @@ void free(void *ptr)
         splice(ptr - (fnode.size + 2 * WORD_SIZE));
         coalesce(ptr);
     }
-    return;
+    
 }
 
 /*
@@ -241,8 +373,30 @@ void free(void *ptr)
  */
 void *realloc(void *oldptr, size_t size)
 {
-    /* IMPLEMENT THIS */
-    return NULL;
+    uint64_t corrected_size = (uint64_t)align(size);
+    free_node node=get_node(oldptr);
+    if(node.size==corrected_size){return oldptr;}
+    if(oldptr=NULL){return malloc(corrected_size);}
+    if(corrected_size=0 ){ free(oldptr); return NULL;}
+    //increase
+    if(node.size< corrected_size){
+        void *newptr=malloc(corrected_size);
+        memcpy(newptr,oldptr,node.size);
+        free(oldptr);
+        return newptr;
+    }
+    //decrease
+    else
+    
+    if((node.size-corrected_size)<4*node.size){ return oldptr;}
+    else{
+        uint64_t free_size= (node.size-corrected_size-2*WORD_SIZE);
+        void* free_ptr=(oldptr+corrected_size+2*WORD_SIZE);
+        set_bound_tags(free_ptr,free_ptr,true);
+        set_bound_tags(oldptr, corrected_size, false);
+        free(free_ptr);
+
+    }
 }
 
 /*
