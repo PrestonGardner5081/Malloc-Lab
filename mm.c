@@ -119,33 +119,6 @@ static free_node get_node(void *ptr)
 
     return node;
 }
-void coalesce(void *ptr)
-{
-
-    free_node curr = get_node(ptr);
-    void *nextptr = (ptr + curr.size + 2 * WORD_SIZE);
-    void *prevptr = (ptr - (curr.size + 2 * WORD_SIZE));
-    //printf("next ptr %p\n",nextptr);
-    //printf("prev ptr %p\n",prevptr);
-    while (curr.next_addr == NULL)
-    {
-        if (get_node(ptr).valid && get_node(nextptr).valid)
-        {
-            curr.size += (get_node(nextptr).size + 2 * WORD_SIZE);
-        }
-        if (get_node(ptr).valid && get_node(prevptr).valid)
-        { //IF THINGS GO WRONG FIX THIS BY remvoving//get_node(ptr).valid
-            curr.size += (get_node(prevptr).size + 2 * WORD_SIZE);
-        }
-        if (get_node(ptr).valid && get_node(nextptr).valid && get_node(prevptr).valid)
-        {
-            curr.size += (get_node(nextptr).size + get_node(prevptr).size + 2 * WORD_SIZE);
-        }
-
-        //set_next(ptr, curr.next_addr);
-    }
-}
-
 static void *add_space(uint64_t size){
     void *ptr;
     void *prg_break = mem_heap_hi() + 1;
@@ -183,6 +156,7 @@ static void splice(void *ptr){
     free_node node = get_node(ptr);
     set_next(node.prev_addr, node.next_addr);
     set_prev(node.next_addr, node.prev_addr);
+    
 }
 
 static void set_bound_tags(void *ptr, uint64_t size, bool free){
@@ -363,19 +337,34 @@ void *malloc(size_t size)
  * free
  */
 void free(void *ptr)
-{/* 
+{
     if(ptr==NULL){return;}
     free_node fnode = get_node(ptr);
-    free_node node_n = get_node(ptr + fnode.size + 2 * WORD_SIZE);
-    free_node node_p = get_node(ptr - (fnode.size + 2 * WORD_SIZE));
+    //free_node node_n = get_node(fnode.next_addr);
+    //free_node node_p = get_node(fnode.prev_addr);
+    bool next_free;
+    //check if next block is prg break
+    if((ptr + fnode.size + WORD_SIZE + WORD_SIZE) < mem_heap_hi()){
+        next_free = is_allocated(mem_read(ptr + fnode.size + WORD_SIZE, WORD_SIZE));
+
+    }
+    else
+        next_free = false;
+
+    //check if prev block is root
+    bool prev_free;
+    if(ptr - 2 * WORD_SIZE == root_addr)
+        prev_free = is_allocated(mem_read(ptr - 2 * WORD_SIZE, WORD_SIZE));
+    else
+        prev_free = false;
 
     //case 1
     if (fnode.valid)
     {
-        add_node(ptr, fnode.size);
+        return;
     }
     //case 4
-    else if (node_p.valid && node_n.valid)
+    else if (!next_free && !prev_free)
     {
         add_node(ptr, fnode.size);
         splice(ptr + fnode.size + 2 * WORD_SIZE);
@@ -383,19 +372,19 @@ void free(void *ptr)
         coalesce(ptr);
     }
     //case 2
-    else if (node_n.valid)
+    else if (!next_free)
     {
         add_node(ptr, fnode.size);
         splice(ptr + fnode.size + 2 * WORD_SIZE);
         coalesce(ptr);
     }
     //case 3
-    else if (node_p.valid)
+    else if (!prev_free)
     {
         add_node(ptr, fnode.size);
         splice(ptr - (fnode.size + 2 * WORD_SIZE));
         coalesce(ptr);
-    } */
+    } 
     
 }
 
@@ -404,30 +393,30 @@ void free(void *ptr)
  */
 void *realloc(void *oldptr, size_t size)
 {
-    // uint64_t corrected_size = (uint64_t)align(size);
-    // free_node node=get_node(oldptr);
-    // if(node.size==corrected_size){return oldptr;}
-    // if(oldptr==NULL){return malloc(corrected_size);}
-    // if(corrected_size==0 ){ free(oldptr); return NULL;}
-    // //increase
-    // if(node.size< corrected_size){
-    //     void *newptr=malloc(corrected_size);
-    //     memcpy(newptr,oldptr,node.size);
-    //     free(oldptr);
-    //     return newptr;
-    // }
-    // //decrease
-    // else
+    uint64_t corrected_size = (uint64_t)align(size);
+    free_node node=get_node(oldptr);
+    if(node.size==corrected_size){return oldptr;}
+    if(oldptr==NULL){return malloc(corrected_size);}
+    if(corrected_size==0 ){ free(oldptr); return NULL;}
+    //increase
+    if(node.size< corrected_size){
+        void *newptr=malloc(corrected_size);
+        memcpy(newptr,oldptr,node.size);
+        free(oldptr);
+        return newptr;
+    }
+    //decrease
+    else
     
-    // if((node.size-corrected_size)<4*node.size){ return oldptr;}
-    // else{
-    //     uint64_t free_size= (node.size-corrected_size-2*WORD_SIZE);
-    //     void* free_ptr=(oldptr+corrected_size+2*WORD_SIZE);
-    //     set_bound_tags(free_ptr,free_size,true);
-    //     set_bound_tags(oldptr, corrected_size, false);
-    //     free(free_ptr);
-    //     return oldptr;
-    // }
+    if((node.size-corrected_size)<4*node.size){ return oldptr;}
+    else{
+        uint64_t free_size= (node.size-corrected_size-2*WORD_SIZE);
+        void* free_ptr=(oldptr+corrected_size+2*WORD_SIZE);
+        set_bound_tags(free_ptr,free_size,true);
+        set_bound_tags(oldptr, corrected_size, false);
+        free(free_ptr);
+        return oldptr;
+    }
     return NULL;
 }
 
@@ -472,6 +461,14 @@ static bool aligned(const void *p)
 bool mm_checkheap(int lineno)
 {
 #ifdef DEBUG
+
+
+
+
+
+
+
+
     /* Write code to check heap invariants here */
     /* IMPLEMENT THIS */
 #endif /* DEBUG */
