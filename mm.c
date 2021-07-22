@@ -25,7 +25,7 @@
  * uncomment the following line. Be sure not to have debugging enabled
  * in your final submission.
  */
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 /* When debugging is enabled, the underlying functions get called */
@@ -58,7 +58,10 @@
 static void *root;
 //root pointer
 static void *root_addr;
-//May have to manually keep track of last byte
+//count num commands given FIXME
+int command_count = 4; //FIXME
+//debug log file FIXME
+FILE *log_fp;
 
 struct free_node
 {
@@ -70,6 +73,7 @@ struct free_node
 };
 
 typedef struct free_node free_node; 
+
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x)
@@ -215,10 +219,10 @@ static void alloc(void *space, uint64_t size){
         }
         set_bound_tags(space, size, false);
 
-        // FIXME
+        // // FIXME
         // free_node test_a = get_node(space);     
         // printf("\nuse me to stop exec\n");
-        // FIXME
+        // // FIXME
     }
     else{
         void *new_free = space + size + 2 * WORD_SIZE;
@@ -251,6 +255,108 @@ static void print_node_list(){
     }
 }
 
+
+static void mem_traverse(char *func, int count){
+    void *cur_ptr = mem_heap_lo() + 8;
+    while(cur_ptr < mem_heap_hi()){
+        uint64_t open_tag = mem_read(cur_ptr, WORD_SIZE);
+        uint64_t size = tag_to_size(open_tag);
+        bool open_valid = !is_allocated(open_tag);
+
+        void *close_addr = cur_ptr + size + WORD_SIZE;
+        if(close_addr > mem_heap_hi()){
+            printf("\nThe current boundary tag is invalid\n and extends past the prg brk: %p\n", cur_ptr);
+            printf("%s, %d", func, count);
+            return;
+        }
+        uint64_t close_tag = mem_read(close_addr, WORD_SIZE);
+        uint64_t close_tag_size = tag_to_size(close_tag);
+        bool close_valid = !is_allocated(close_tag);
+        if(size != close_tag_size){
+            printf("\nThe current boundary tag is invalid\n and does not equal its closing tag: %p\n", cur_ptr);
+            printf("open tag: %p = %ld\n", cur_ptr, open_tag);
+            printf("closing tag: %p = %ld\n", close_addr, close_tag);
+            printf("%s, %d", func, count);
+            return;
+        }
+        if(open_valid != close_valid){
+            printf("\nThe current boundary tag is invalid\n and does not have the same validity\n as its closing tag: %p\n", cur_ptr);
+            printf("open tag: %p = %ld\n", cur_ptr, open_tag);
+            printf("closing tag: %p = %ld\n", close_addr, close_tag);
+            printf("%s, %d\n", func, count);
+        }
+        cur_ptr = close_addr + WORD_SIZE;
+    }
+}
+
+static void print_blocks(char *func, int count){
+    log_fp = fopen("debug_log.txt", "a+");
+    void *cur_ptr = mem_heap_lo() + 8;
+    void *ptr = root;
+    void *nodes[100];
+    uint8_t f_nodes_count = 0;
+
+    //make a list of free nodes by traversing list
+    while(ptr != (void *)0){
+        free_node cur_node = get_node(ptr); 
+        nodes[f_nodes_count] = ptr;
+        ptr = cur_node.next_addr;
+        f_nodes_count++;
+    }
+    
+    //check every word to see if its a tag, if it is print metadata 
+    while(cur_ptr < mem_heap_hi() - WORD_SIZE - 1){
+        log_fp = fopen("debug_log.txt", "a+");
+        uint64_t size = tag_to_size(mem_read(cur_ptr, WORD_SIZE));
+        bool open_valid = !is_allocated(mem_read(cur_ptr, WORD_SIZE));
+        void *close_addr = cur_ptr + size + WORD_SIZE;
+        if(close_addr > mem_heap_hi()){
+            cur_ptr += WORD_SIZE;
+            continue;
+        }
+        uint64_t close_tag = tag_to_size(mem_read(close_addr, WORD_SIZE));
+        bool close_valid = !is_allocated(mem_read(close_addr, WORD_SIZE));
+        if(close_tag == size){
+            if(close_valid != open_valid){
+                fprintf(log_fp, "\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
+                fprintf(log_fp, "\n%s, %d\n", func, count);
+            }
+            else{
+                fprintf(log_fp, "\nFound block at %p\n free?: %d\n", cur_ptr + WORD_SIZE, open_valid);
+                if(open_valid){
+                    free_node node = get_node(cur_ptr + WORD_SIZE);
+                    fprintf(log_fp, "next: %p\n", node.next_addr);
+                    if(node.next_addr != 0 && (mem_heap_hi() < node.next_addr || node.next_addr < mem_heap_lo()))
+                        fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
+                    fprintf(log_fp, "prev: %p\n", node.prev_addr);
+                    if(node.prev_addr != 0 && (mem_heap_hi() < node.prev_addr || node.prev_addr < mem_heap_lo()))
+                        fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
+                    fprintf(log_fp, "size: %ld\n", node.size);   
+                }
+                fprintf(log_fp, "%s, %d\n", func, count);
+            }
+
+            if(open_valid){ 
+                bool is_in_list = false;
+                void *node_ptr = cur_ptr + WORD_SIZE; 
+                for(int i = 0; i < 100; i++){
+                    if(node_ptr == nodes[i]){
+                        is_in_list = true;
+                        break;
+                    }
+                }
+                if(!is_in_list){
+                    fprintf(log_fp, "**WARNING: NODE IS NOT IN LIST**\n");
+                }
+            }
+            cur_ptr += size + 2*WORD_SIZE;
+            continue;
+        }
+        cur_ptr += WORD_SIZE;
+    }
+    fclose(log_fp);
+}
+
 /*
  * Initialize: returns false on error, true on success.
  */
@@ -275,7 +381,8 @@ bool mm_init(void)
 
     // printf("\nuse me to stop exec\n");
     //FIXME
-    
+    log_fp = fopen("debug_log.txt", "w+");
+    fclose(log_fp);
     return true;
 }
 
@@ -284,6 +391,7 @@ bool mm_init(void)
  */
 void *malloc(size_t size)
 {
+    command_count += 1; //FIXME
     /* IMPLEMENT THIS */
     if(size == 0){
         return NULL; 
@@ -294,8 +402,8 @@ void *malloc(size_t size)
         space = add_space(corrected_size);
     }
     //FIXME
-    free_node space_node = get_node(space);
-    printf("\n%p\n",space_node.next_addr);
+    // free_node space_node = get_node(space);
+    // printf("\n%p\n",space_node.next_addr);
     //FIXME
 
     alloc(space, corrected_size);
@@ -305,8 +413,8 @@ void *malloc(size_t size)
     // printf("corrected_size: %ld", corrected_size);
     //print_node_list();
     //printf("\nuse me to stop exec\n");
+    print_blocks("malloc",command_count);
     //FIXME
-
     return space;
 }
 
@@ -381,6 +489,10 @@ void free(void *ptr)
     //case 1
     else
         add_node(ptr, fnode.size);
+
+    //FIXME
+    print_blocks("free",command_count);   
+    //FIXME
 }
 
 /*
@@ -388,27 +500,50 @@ void free(void *ptr)
  */
 void *realloc(void *oldptr, size_t size)
 {
+    command_count += 1; //FIXME
     uint64_t corrected_size = (uint64_t)align(size);
     free_node node=get_node(oldptr);
     if(node.size==corrected_size){return oldptr;}
-    if(oldptr==NULL){return malloc(corrected_size);}
-    if(corrected_size==0 ){ free(oldptr); return NULL;}
+    if(oldptr==NULL){
+        command_count -= 1;
+        return malloc(corrected_size);
+    }
+    if(corrected_size==0 ){
+        free(oldptr);
+        command_count -= 1;//FIXME
+        //FIXME
+        print_blocks("realloc",command_count);   
+        //FIXME
+        return NULL;
+    }
     //increase
     if(node.size< corrected_size){
         void *newptr=malloc(corrected_size);
         memcpy(newptr,oldptr,node.size);
         free(oldptr);
+        command_count -= 1;//FIXME
+        //FIXME
+        print_blocks("realloc",command_count);   
+        //FIXME
         return newptr;
     }
     //decrease
-    else if((node.size-corrected_size)<4*node.size) 
+    else if((node.size-corrected_size)<4*node.size){ 
+        //FIXME
+        print_blocks("realloc",command_count);   
+        //FIXME
         return oldptr;
+    }
     else{
         uint64_t free_size= (node.size-corrected_size-2*WORD_SIZE);
         void* free_ptr=(oldptr+corrected_size+2*WORD_SIZE);
         set_bound_tags(free_ptr,free_size,true);
         set_bound_tags(oldptr, corrected_size, false);
         free(free_ptr);
+        command_count -= 1;//FIXME
+        //FIXME
+        print_blocks("realloc",command_count);   
+        //FIXME
         return oldptr;
     }
     // return NULL;
@@ -423,6 +558,7 @@ void *calloc(size_t nmemb, size_t size)
     void *ptr;
     size *= nmemb;
     ptr = malloc(size);
+    command_count -= 1;
     if (ptr)
     {
         memset(ptr, 0, size);
@@ -449,6 +585,7 @@ static bool aligned(const void *p)
     return align(ip) == ip;
 }
 
+
 /*
  * mm_checkheap
  */
@@ -457,6 +594,7 @@ bool mm_checkheap(int lineno)
 #ifdef DEBUG
     /* Write code to check heap invariants here */
     /* IMPLEMENT THIS */
+
 #endif /* DEBUG */
     return true;
 }
