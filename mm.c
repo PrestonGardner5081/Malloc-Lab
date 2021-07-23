@@ -256,40 +256,40 @@ static void print_node_list(){
 }
 
 
-static void mem_traverse(char *func, int count){
-    void *cur_ptr = mem_heap_lo() + 8;
-    while(cur_ptr < mem_heap_hi()){
-        uint64_t open_tag = mem_read(cur_ptr, WORD_SIZE);
-        uint64_t size = tag_to_size(open_tag);
-        bool open_valid = !is_allocated(open_tag);
+// static void mem_traverse(char *func, int count){
+//     void *cur_ptr = mem_heap_lo() + 8;
+//     while(cur_ptr < mem_heap_hi()){
+//         uint64_t open_tag = mem_read(cur_ptr, WORD_SIZE);
+//         uint64_t size = tag_to_size(open_tag);
+//         bool open_valid = !is_allocated(open_tag);
 
-        void *close_addr = cur_ptr + size + WORD_SIZE;
-        if(close_addr > mem_heap_hi()){
-            printf("\nThe current boundary tag is invalid\n and extends past the prg brk: %p\n", cur_ptr);
-            printf("%s, %d", func, count);
-            return;
-        }
-        uint64_t close_tag = mem_read(close_addr, WORD_SIZE);
-        uint64_t close_tag_size = tag_to_size(close_tag);
-        bool close_valid = !is_allocated(close_tag);
-        if(size != close_tag_size){
-            printf("\nThe current boundary tag is invalid\n and does not equal its closing tag: %p\n", cur_ptr);
-            printf("open tag: %p = %ld\n", cur_ptr, open_tag);
-            printf("closing tag: %p = %ld\n", close_addr, close_tag);
-            printf("%s, %d", func, count);
-            return;
-        }
-        if(open_valid != close_valid){
-            printf("\nThe current boundary tag is invalid\n and does not have the same validity\n as its closing tag: %p\n", cur_ptr);
-            printf("open tag: %p = %ld\n", cur_ptr, open_tag);
-            printf("closing tag: %p = %ld\n", close_addr, close_tag);
-            printf("%s, %d\n", func, count);
-        }
-        cur_ptr = close_addr + WORD_SIZE;
-    }
-}
+//         void *close_addr = cur_ptr + size + WORD_SIZE;
+//         if(close_addr > mem_heap_hi()){
+//             printf("\nThe current boundary tag is invalid\n and extends past the prg brk: %p\n", cur_ptr);
+//             printf("%s, %d", func, count);
+//             return;
+//         }
+//         uint64_t close_tag = mem_read(close_addr, WORD_SIZE);
+//         uint64_t close_tag_size = tag_to_size(close_tag);
+//         bool close_valid = !is_allocated(close_tag);
+//         if(size != close_tag_size){
+//             printf("\nThe current boundary tag is invalid\n and does not equal its closing tag: %p\n", cur_ptr);
+//             printf("open tag: %p = %ld\n", cur_ptr, open_tag);
+//             printf("closing tag: %p = %ld\n", close_addr, close_tag);
+//             printf("%s, %d", func, count);
+//             return;
+//         }
+//         if(open_valid != close_valid){
+//             printf("\nThe current boundary tag is invalid\n and does not have the same validity\n as its closing tag: %p\n", cur_ptr);
+//             printf("open tag: %p = %ld\n", cur_ptr, open_tag);
+//             printf("closing tag: %p = %ld\n", close_addr, close_tag);
+//             printf("%s, %d\n", func, count);
+//         }
+//         cur_ptr = close_addr + WORD_SIZE;
+//     }
+// }
 
-static void print_blocks(char *func, int count){
+static void print_blocks(char *func, int count, uint64_t c_size){
     log_fp = fopen("debug_log.txt", "a+");
     void *cur_ptr = mem_heap_lo() + 8;
     void *ptr = root;
@@ -306,7 +306,6 @@ static void print_blocks(char *func, int count){
     
     //check every word to see if its a tag, if it is print metadata 
     while(cur_ptr < mem_heap_hi() - WORD_SIZE - 1){
-        log_fp = fopen("debug_log.txt", "a+");
         uint64_t size = tag_to_size(mem_read(cur_ptr, WORD_SIZE));
         bool open_valid = !is_allocated(mem_read(cur_ptr, WORD_SIZE));
         void *close_addr = cur_ptr + size + WORD_SIZE;
@@ -319,7 +318,7 @@ static void print_blocks(char *func, int count){
         if(close_tag == size){
             if(close_valid != open_valid){
                 fprintf(log_fp, "\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
-                fprintf(log_fp, "\n%s, %d\n", func, count);
+                fprintf(log_fp, "\nfunc: %s, count: %d, size: %ld\n", func, count, c_size);
             }
             else{
                 fprintf(log_fp, "\nFound block at %p\n free?: %d\n", cur_ptr + WORD_SIZE, open_valid);
@@ -333,9 +332,8 @@ static void print_blocks(char *func, int count){
                         fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
                     fprintf(log_fp, "size: %ld\n", node.size);   
                 }
-                fprintf(log_fp, "%s, %d\n", func, count);
+                fprintf(log_fp, "\nfunc: %s, count: %d, size: %ld\n", func, count, c_size);
             }
-
             if(open_valid){ 
                 bool is_in_list = false;
                 void *node_ptr = cur_ptr + WORD_SIZE; 
@@ -350,9 +348,9 @@ static void print_blocks(char *func, int count){
                 }
             }
             cur_ptr += size + 2*WORD_SIZE;
-            continue;
         }
-        cur_ptr += WORD_SIZE;
+        else
+            cur_ptr += WORD_SIZE;
     }
     fclose(log_fp);
 }
@@ -370,19 +368,19 @@ bool mm_init(void)
     root_addr = mem_heap_lo();
     //initialize first node
     add_space_root();
-
-    //FIXME
-
-    // mm_malloc(32);
-    // //add_space(32);
-    // mm_malloc(64);
-    // //add_space(64);
-    // mm_malloc(128);
-
-    // printf("\nuse me to stop exec\n");
-    //FIXME
     log_fp = fopen("debug_log.txt", "w+");
     fclose(log_fp);
+
+    // FIXME
+
+    mm_malloc(32);
+    //add_space(32);
+    mm_malloc(64);
+    //add_space(64);
+    mm_malloc(128);
+
+    printf("\nuse me to stop exec\n");
+    // FIXME
     return true;
 }
 
@@ -413,7 +411,7 @@ void *malloc(size_t size)
     // printf("corrected_size: %ld", corrected_size);
     //print_node_list();
     //printf("\nuse me to stop exec\n");
-    print_blocks("malloc",command_count);
+    print_blocks("malloc",command_count, size);
     //FIXME
     return space;
 }
@@ -429,6 +427,7 @@ static bool validate_size(uint64_t size){
  */
 void free(void *ptr)
 {
+    command_count++;//FIXME
     if(ptr==NULL){return;}
     free_node fnode = get_node(ptr);
     // free_node node_n = get_node(fnode.next_addr);
@@ -491,7 +490,7 @@ void free(void *ptr)
         add_node(ptr, fnode.size);
 
     //FIXME
-    print_blocks("free",command_count);   
+    print_blocks("free",command_count, fnode.size);   
     //FIXME
 }
 
@@ -512,7 +511,7 @@ void *realloc(void *oldptr, size_t size)
         free(oldptr);
         command_count -= 1;//FIXME
         //FIXME
-        print_blocks("realloc",command_count);   
+        print_blocks("realloc",command_count, size);   
         //FIXME
         return NULL;
     }
@@ -523,14 +522,14 @@ void *realloc(void *oldptr, size_t size)
         free(oldptr);
         command_count -= 1;//FIXME
         //FIXME
-        print_blocks("realloc",command_count);   
+        print_blocks("realloc",command_count,size);   
         //FIXME
         return newptr;
     }
     //decrease
     else if((node.size-corrected_size)<4*node.size){ 
         //FIXME
-        print_blocks("realloc",command_count);   
+        print_blocks("realloc",command_count, size);   
         //FIXME
         return oldptr;
     }
@@ -542,7 +541,7 @@ void *realloc(void *oldptr, size_t size)
         free(free_ptr);
         command_count -= 1;//FIXME
         //FIXME
-        print_blocks("realloc",command_count);   
+        print_blocks("realloc",command_count, size);   
         //FIXME
         return oldptr;
     }
