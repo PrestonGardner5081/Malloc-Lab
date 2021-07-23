@@ -122,6 +122,39 @@ static void *find_space(uint64_t size){
     return ptr; 
 }
 
+
+
+static void set_next(void *ptr, void *next){
+    mem_write(ptr, (uint64_t)next, WORD_SIZE);
+}
+
+static void set_prev(void *ptr, void *prev){
+    mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
+}
+
+static void splice(void *ptr){
+    free_node node = get_node(ptr);
+    if(node.prev_addr != 0)
+        set_next(node.prev_addr, node.next_addr);
+    else{
+        if(node.next_addr != 0){
+            root = node.next_addr;  
+            mem_write(root_addr, (uint64_t)node.next_addr, WORD_SIZE);
+        }
+    }
+    if(node.next_addr != 0)
+        set_prev(node.next_addr, node.prev_addr);
+}
+
+static void set_bound_tags(void *ptr, uint64_t size, bool free){
+    uint64_t tag = size;
+    if(!free){
+        tag = size | 1; 
+    }
+    mem_write(ptr - WORD_SIZE, tag, WORD_SIZE);
+    mem_write(ptr + size, tag, WORD_SIZE);
+}
+
 static void add_node(void *ptr, uint64_t size){
     void *next = root;
     root = ptr;
@@ -137,6 +170,27 @@ static void add_node(void *ptr, uint64_t size){
     mem_write(ptr - WORD_SIZE, size, WORD_SIZE);
     //set size for upper size
     mem_write(ptr + size, size, WORD_SIZE);
+}
+
+static void overwrite_node(void *ptr, uint64_t size){
+    set_prev(ptr, NULL);
+    free_node cur_node = get_node(ptr);
+    
+    if(cur_node.next_addr != 0)
+        set_prev(cur_node.next_addr, ptr);
+
+    if(root == ptr){
+        set_next(ptr, cur_node.next_addr);
+    }   
+    else{
+        void *next = root;
+        root = ptr;
+        //update actual root 
+        mem_write(root_addr, (uint64_t)root, WORD_SIZE);
+        set_next(ptr, next);
+    }
+
+    set_bound_tags(ptr, size, true);
 }
 
 static void *add_space(uint64_t size){
@@ -164,31 +218,6 @@ static void *add_space(uint64_t size){
     return ptr;
 }
 
-static void set_next(void *ptr, void *next){
-    mem_write(ptr, (uint64_t)next, WORD_SIZE);
-}
-
-static void set_prev(void *ptr, void *prev){
-    mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
-}
-
-static void splice(void *ptr){
-    free_node node = get_node(ptr);
-    if(node.prev_addr != 0)
-        set_next(node.prev_addr, node.next_addr);
-    if(node.next_addr != 0)
-        set_prev(node.next_addr, node.prev_addr);
-}
-
-static void set_bound_tags(void *ptr, uint64_t size, bool free){
-    uint64_t tag = size;
-    if(!free){
-        tag = size | 1; 
-    }
-    mem_write(ptr - WORD_SIZE, tag, WORD_SIZE);
-    mem_write(ptr + size, tag, WORD_SIZE);
-}
-
 static void add_space_root(){
     void *new_node = mem_heap_hi() + 1 + WORD_SIZE;
     mem_sbrk(4*WORD_SIZE);
@@ -205,38 +234,43 @@ static void add_space_root(){
 
 static void alloc(void *space, uint64_t size){
     free_node free_space = get_node(space);
-    uint64_t new_node_size = free_space.size - size - WORD_SIZE; 
+    // uint64_t new_node_size = free_space.size - size - WORD_SIZE; 
 
-    if(free_space.size == size || new_node_size < 2*WORD_SIZE){
-        if(free_space.prev_addr == NULL){
-            add_space_root();
-        }
-        else if(free_space.next_addr != NULL){
-            splice(space);
-        }
-        else{
-            set_next(free_space.prev_addr, NULL);
-        }
-        set_bound_tags(space, size, false);
-
-        // // FIXME
-        // free_node test_a = get_node(space);     
-        // printf("\nuse me to stop exec\n");
-        // // FIXME
+    // if(free_space.size == size || new_node_size < 2*WORD_SIZE){
+    //add node if free_space is the only node
+    if(free_space.prev_addr == NULL && free_space.next_addr == NULL){
+        add_space_root();
     }
     else{
-        void *new_free = space + size + 2 * WORD_SIZE;
-        set_next(new_free, free_space.next_addr);
-        set_prev(new_free, free_space.prev_addr);
-        set_bound_tags(space, size, false);
-        set_bound_tags(new_free, new_node_size, true);
-
-        //FIXME
-        // free_node test_new = get_node(new_free);
-        // free_node test_a = get_node(space);
-        // printf("\nuse me to stop exec\n");
-        //FIXME
+        splice(space);
     }
+    set_bound_tags(space, size, false);
+
+    //     else if(free_space.next_addr != NULL){
+    //     }
+    //     else{
+    //         set_next(free_space.prev_addr, NULL);
+    //     }
+    //     set_bound_tags(space, size, false);
+
+    //     // // FIXME
+    //     // free_node test_a = get_node(space);     
+    //     // printf("\nuse me to stop exec\n");
+    //     // // FIXME
+    // }
+    // else{
+    //     void *new_free = space + size + 2 * WORD_SIZE;
+    //     set_next(new_free, free_space.next_addr);
+    //     set_prev(new_free, free_space.prev_addr);
+    //     set_bound_tags(space, size, false);
+    //     set_bound_tags(new_free, new_node_size, true);
+
+    //     //FIXME
+    //     // free_node test_new = get_node(new_free);
+    //     // free_node test_a = get_node(space);
+    //     // printf("\nuse me to stop exec\n");
+    //     //FIXME
+    // }
 }
 
 static void print_node_list(){
@@ -304,6 +338,8 @@ static void print_blocks(char *func, int count, uint64_t c_size){
         f_nodes_count++;
     }
     
+    fprintf(log_fp, "\n\n\nFUNCTION: %s COMMAND#: %d SIZE: %ld", func, count, c_size);
+    fprintf(log_fp, "\nRoot read: %p, root: %p\n root_addr: %p, heap lo: %p\n", (void *)mem_read(root_addr, 8), root, root_addr, mem_heap_lo());
     //check every word to see if its a tag, if it is print metadata 
     while(cur_ptr < mem_heap_hi() - WORD_SIZE - 1){
         uint64_t size = tag_to_size(mem_read(cur_ptr, WORD_SIZE));
@@ -317,8 +353,8 @@ static void print_blocks(char *func, int count, uint64_t c_size){
         bool close_valid = !is_allocated(mem_read(close_addr, WORD_SIZE));
         if(close_tag == size){
             if(close_valid != open_valid){
-                fprintf(log_fp, "\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
-                fprintf(log_fp, "\nfunc: %s, count: %d, size: %ld\n", func, count, c_size);
+                fprintf(log_fp, "\n\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
+                fprintf(log_fp, "size: %ld\n", size);
             }
             else{
                 fprintf(log_fp, "\nFound block at %p\n free?: %d\n", cur_ptr + WORD_SIZE, open_valid);
@@ -329,10 +365,9 @@ static void print_blocks(char *func, int count, uint64_t c_size){
                         fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
                     fprintf(log_fp, "prev: %p\n", node.prev_addr);
                     if(node.prev_addr != 0 && (mem_heap_hi() < node.prev_addr || node.prev_addr < mem_heap_lo()))
-                        fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
-                    fprintf(log_fp, "size: %ld\n", node.size);   
+                        fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n"); 
                 }
-                fprintf(log_fp, "\nfunc: %s, count: %d, size: %ld\n", func, count, c_size);
+                fprintf(log_fp, "size: %ld\n", size);
             }
             if(open_valid){ 
                 bool is_in_list = false;
@@ -352,6 +387,7 @@ static void print_blocks(char *func, int count, uint64_t c_size){
         else
             cur_ptr += WORD_SIZE;
     }
+    fprintf(log_fp, "END TRAVERSE COMMAND#: %d FUNCTION: %s SIZE: %ld", count, func, c_size);
     fclose(log_fp);
 }
 
@@ -373,14 +409,14 @@ bool mm_init(void)
 
     // FIXME
 
-    mm_malloc(32);
-    //add_space(32);
-    mm_malloc(64);
-    //add_space(64);
-    mm_malloc(128);
+    // mm_malloc(32);
+    // //add_space(32);
+    // mm_malloc(64);
+    // //add_space(64);
+    // mm_malloc(128);
 
-    printf("\nuse me to stop exec\n");
-    // FIXME
+    // printf("\nuse me to stop exec\n");
+    // // FIXME
     return true;
 }
 
@@ -411,7 +447,7 @@ void *malloc(size_t size)
     // printf("corrected_size: %ld", corrected_size);
     //print_node_list();
     //printf("\nuse me to stop exec\n");
-    print_blocks("malloc",command_count, size);
+    print_blocks("malloc",command_count, corrected_size);
     //FIXME
     return space;
 }
@@ -449,9 +485,9 @@ void free(void *ptr)
 
     //check if prev block is root
     bool prev_free;
-    if(ptr - 2 * WORD_SIZE == root_addr){
+    if(ptr - 2 * WORD_SIZE > root_addr){
         void *bound_tag = ptr - 2 * WORD_SIZE;
-        uint64_t prev_size = tag_to_size((uint64_t)bound_tag);
+        uint64_t prev_size = tag_to_size(mem_read(bound_tag, WORD_SIZE));
         if(validate_size(prev_size)){
             prev_node = get_node(bound_tag - prev_size);
             prev_free = prev_node.valid;    
@@ -471,7 +507,7 @@ void free(void *ptr)
     {
         splice(next_node.cur_addr);
         splice(prev_node.cur_addr);
-        add_node(prev_node.cur_addr, fnode.size + prev_node.size + next_node.size + 4*WORD_SIZE);
+        overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + next_node.size + 4*WORD_SIZE);
     }
     //case 2
     else if (next_free)
@@ -483,7 +519,7 @@ void free(void *ptr)
     else if (prev_free)
     {
         splice(prev_node.cur_addr);
-        add_node(ptr, fnode.size + 2*WORD_SIZE);
+        overwrite_node(ptr, fnode.size + 2*WORD_SIZE);
     }
     //case 1
     else
