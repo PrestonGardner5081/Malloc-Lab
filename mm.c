@@ -519,7 +519,7 @@ void free(void *ptr)
     else if (prev_free)
     {
         splice(prev_node.cur_addr);
-        overwrite_node(ptr, fnode.size + 2*WORD_SIZE);
+        overwrite_node(prev_node.cur_addr, fnode.size + 2*WORD_SIZE);
     }
     //case 1
     else
