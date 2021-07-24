@@ -132,19 +132,6 @@ static void set_prev(void *ptr, void *prev){
     mem_write(ptr + WORD_SIZE, (uint64_t)prev, WORD_SIZE);
 }
 
-static void splice(void *ptr){
-    free_node node = get_node(ptr);
-    if(node.prev_addr != 0)
-        set_next(node.prev_addr, node.next_addr);
-    else{
-        if(node.next_addr != 0){
-            root = node.next_addr;  
-            mem_write(root_addr, (uint64_t)node.next_addr, WORD_SIZE);
-        }
-    }
-    if(node.next_addr != 0)
-        set_prev(node.next_addr, node.prev_addr);
-}
 
 static void set_bound_tags(void *ptr, uint64_t size, bool free){
     uint64_t tag = size;
@@ -230,6 +217,23 @@ static void add_space_root(){
     // free_node test_f = get_node(new_node);     
     // printf("\nuse me to stop exec\n");
     // FIXME
+}
+
+static void splice(void *ptr){
+    free_node node = get_node(ptr);
+    if(node.prev_addr == 0 && node.next_addr == 0){
+        add_space_root();
+    }
+    else if(node.prev_addr == 0){
+        root = node.next_addr;  
+        mem_write(root_addr, (uint64_t)node.next_addr, WORD_SIZE);
+        set_prev(node.next_addr, 0);
+    }
+    else{
+        set_next(node.prev_addr, node.next_addr);
+        if(node.next_addr != 0)
+            set_prev(node.next_addr, node.prev_addr);
+    }
 }
 
 static void alloc(void *space, uint64_t size){
