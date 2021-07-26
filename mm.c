@@ -74,6 +74,11 @@ struct free_node
 
 typedef struct free_node free_node; 
 
+/*writes given value to root global var and to root addr*/
+static void set_root(void *ptr){
+    root = ptr;
+    mem_write(root_addr, (uint64_t)root, WORD_SIZE);
+}
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 static size_t align(size_t x)
@@ -222,7 +227,7 @@ static void add_space_root(){
 static void splice(void *ptr){
     free_node node = get_node(ptr);
     if(node.prev_addr == 0 && node.next_addr == 0){
-        add_space_root();
+        // add_space_root();
     }
     else if(node.prev_addr == 0){
         root = node.next_addr;  
@@ -238,15 +243,26 @@ static void splice(void *ptr){
 
 static void alloc(void *space, uint64_t size){
     free_node free_space = get_node(space);
-    // uint64_t new_node_size = free_space.size - size - WORD_SIZE; 
+    int new_node_size = free_space.size - size - 2*WORD_SIZE; 
 
-    // if(free_space.size == size || new_node_size < 2*WORD_SIZE){
-    //add node if free_space is the only node
-    if(free_space.prev_addr == NULL && free_space.next_addr == NULL){
+    //add node if free_space is the only node and if node needs to be overwritten
+    if((size == free_space.size ||  new_node_size < (int)(2*WORD_SIZE))&& free_space.prev_addr == NULL && free_space.next_addr == NULL){
         add_space_root();
+        size = free_space.size;    
     }
-    else{
+    //if node is not the only in the list but will be overwritten, splice it
+    else if(size == free_space.size ||  new_node_size < (int)(2*WORD_SIZE)){
         splice(space);
+        size = free_space.size;
+    }
+    //else split node
+    else{
+        void *new_node = space + size + 2*WORD_SIZE;
+        set_next(new_node, free_space.next_addr);
+        set_prev(new_node, free_space.prev_addr);
+        set_bound_tags(new_node, new_node_size, true);
+        root = new_node;
+        mem_write(root_addr, (uint64_t)new_node, 8);
     }
     set_bound_tags(space, size, false);
 
@@ -391,6 +407,7 @@ static void print_blocks(char *func, int count, uint64_t c_size){
         else
             cur_ptr += WORD_SIZE;
     }
+    fprintf(log_fp, "PRG BRK %p\n", mem_heap_hi());
     fprintf(log_fp, "END TRAVERSE COMMAND#: %d FUNCTION: %s SIZE: %ld", count, func, c_size);
     fclose(log_fp);
 }
@@ -430,6 +447,7 @@ bool mm_init(void)
 void *malloc(size_t size)
 {
     command_count += 1; //FIXME
+    printf("\n%d\n", command_count);
     /* IMPLEMENT THIS */
     if(size == 0){
         return NULL; 
@@ -468,6 +486,7 @@ static bool validate_size(uint64_t size){
 void free(void *ptr)
 {
     command_count++;//FIXME
+    printf("\n%d\n", command_count);
     if(ptr==NULL){return;}
     free_node fnode = get_node(ptr);
     // free_node node_n = get_node(fnode.next_addr);
@@ -509,21 +528,35 @@ void free(void *ptr)
     //case 4
     else if (next_free && prev_free)
     {
-        splice(next_node.cur_addr);
-        splice(prev_node.cur_addr);
+        //splice only if surrounding nodes are not only nodes in list
+        if((next_node.next_addr || prev_node.prev_addr) && (next_node.prev_addr || prev_node.next_addr)){
+            splice(next_node.cur_addr);
+            splice(prev_node.cur_addr);
+        }
+        else{
+            root = prev_node.cur_addr;
+            mem_write(root_addr, (uint64_t)prev_node.cur_addr, WORD_SIZE);
+        }
         overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + next_node.size + 4*WORD_SIZE);
     }
     //case 2
     else if (next_free)
     {
         splice(next_node.cur_addr);
-        add_node(ptr, fnode.size + next_node.size + 2*WORD_SIZE);
+        if(next_node.next_addr == 0 && next_node.prev_addr == 0){
+            set_root(ptr);
+            set_bound_tags(ptr, fnode.size + next_node.size + 2*WORD_SIZE, true);
+            set_next(ptr, NULL);
+            set_prev(ptr, NULL);
+        }
+        else    
+            add_node(ptr, fnode.size + next_node.size + 2*WORD_SIZE);
     }
     //case 3
     else if (prev_free)
     {
         splice(prev_node.cur_addr);
-        overwrite_node(prev_node.cur_addr, fnode.size + 2*WORD_SIZE);
+        overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE);
     }
     //case 1
     else
