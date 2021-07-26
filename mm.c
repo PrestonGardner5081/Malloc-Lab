@@ -168,9 +168,11 @@ static void overwrite_node(void *ptr, uint64_t size){
     set_prev(ptr, NULL);
     free_node cur_node = get_node(ptr);
     
+    //if the node is not last 
     if(cur_node.next_addr != 0)
         set_prev(cur_node.next_addr, ptr);
 
+    //IF FIRST IN LIST 
     if(root == ptr){
         set_next(ptr, cur_node.next_addr);
     }   
@@ -227,6 +229,7 @@ static void add_space_root(){
 static void splice(void *ptr){
     free_node node = get_node(ptr);
     if(node.prev_addr == 0 && node.next_addr == 0){
+        return;
         // add_space_root();
     }
     else if(node.prev_addr == 0){
@@ -534,29 +537,40 @@ void free(void *ptr)
             splice(prev_node.cur_addr);
         }
         else{
-            root = prev_node.cur_addr;
-            mem_write(root_addr, (uint64_t)prev_node.cur_addr, WORD_SIZE);
+            set_root(prev_node.cur_addr);
         }
         overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + next_node.size + 4*WORD_SIZE);
     }
     //case 2
     else if (next_free)
     {
-        splice(next_node.cur_addr);
-        if(next_node.next_addr == 0 && next_node.prev_addr == 0){
+        set_bound_tags(ptr, fnode.size + next_node.size + 2*WORD_SIZE, true);
+        if(root != next_node.cur_addr){
+            splice(next_node.cur_addr);    
+            set_prev(root, ptr);
+            set_next(ptr, root);
             set_root(ptr);
-            set_bound_tags(ptr, fnode.size + next_node.size + 2*WORD_SIZE, true);
-            set_next(ptr, NULL);
-            set_prev(ptr, NULL);
         }
-        else    
-            add_node(ptr, fnode.size + next_node.size + 2*WORD_SIZE);
+        else{
+            set_next(ptr, next_node.next_addr);
+            set_prev(ptr, NULL);
+        }   
     }
     //case 3
     else if (prev_free)
     {
-        splice(prev_node.cur_addr);
-        overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE);
+        /*
+        if root is prev, prev is first in list
+        which means we keep all values and overwrite node with new size
+        */
+        if(root != prev_node.cur_addr){
+            splice(prev_node.cur_addr);    
+            set_prev(root, prev_node.cur_addr);
+            set_next(prev_node.cur_addr, root);
+            set_root(prev_node.cur_addr);
+        }   
+        set_bound_tags(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE, true);
+        // overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE);
     }
     //case 1
     else
