@@ -407,7 +407,7 @@ static void print_blocks(char *func, int count, uint64_t c_size){
         else
             cur_ptr += WORD_SIZE;
     }
-    fprintf(log_fp, "PRG BRK %p\n", mem_heap_hi());
+    fprintf(log_fp, "PRG BRK %p\n", mem_heap_hi() + 1);
     fprintf(log_fp, "END TRAVERSE COMMAND#: %d FUNCTION: %s SIZE: %ld", count, func, c_size);
     fclose(log_fp);
 }
