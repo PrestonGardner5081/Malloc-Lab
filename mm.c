@@ -193,12 +193,13 @@ static void *add_space(uint64_t size){
     uint64_t last_tag = mem_read(prg_break - WORD_SIZE, WORD_SIZE);
 
     // printf("WORD_SIZE: %ld\n", WORD_SIZE);
-
+    //last block is allocated, add new free node at end of heap
     if(is_allocated(last_tag)){
         ptr = prg_break + WORD_SIZE;
         mem_sbrk(size + 2 * WORD_SIZE);
         add_node(ptr, size);
     }
+    //last block is free node, extend prg brk and update metadata 
     else{
         uint64_t last_size = tag_to_size(last_tag);
         ptr = prg_break - last_size - WORD_SIZE;
@@ -323,7 +324,7 @@ static void print_blocks(char *func, int count, uint64_t c_size){
         }
         uint64_t close_tag = tag_to_size(mem_read(close_addr, WORD_SIZE));
         bool close_valid = !is_allocated(mem_read(close_addr, WORD_SIZE));
-        if(close_tag == size){
+        if(close_tag == size && size > 0){
             if(close_valid != open_valid){
                 fprintf(log_fp, "\n\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
                 fprintf(log_fp, "size: %ld\n", size);
@@ -444,8 +445,8 @@ void free(void *ptr)
     // free_node node_n = get_node(fnode.next_addr);
     // free_node node_p = get_node(fnode.prev_addr);
     bool next_free;
-    free_node next_node;// = {NULL, NULL, NULL, 0, false};
-    free_node prev_node;// = {NULL, NULL, NULL, 0, false};
+    free_node next_node = {NULL, NULL, NULL, 0, false};
+    free_node prev_node = {NULL, NULL, NULL, 0, false};
     //check if next block is prg break
     if((ptr + fnode.size + WORD_SIZE + WORD_SIZE) < mem_heap_hi()){
         if(validate_size(mem_read(ptr + fnode.size + WORD_SIZE, WORD_SIZE))){
@@ -629,12 +630,11 @@ void free(void *ptr)
     }
     //case 1
     else{
-        set_bound_tags(ptr, fnode.size, true);
-        
         set_prev(root, ptr);
         set_next(ptr, root);
         set_prev(ptr,NULL);
         set_root(ptr);
+        set_bound_tags(ptr, fnode.size, true);
     }
 
 
