@@ -196,15 +196,21 @@ static void *add_space(uint64_t size){
     //last block is allocated, add new free node at end of heap
     if(is_allocated(last_tag)){
         ptr = prg_break + WORD_SIZE;
-        mem_sbrk(size + 2 * WORD_SIZE);
+        void *sbrk_status = mem_sbrk(size + 2 * WORD_SIZE);
+        if(sbrk_status == (void *)-1){
+            return sbrk_status;
+        }
         add_node(ptr, size);
     }
     //last block is free node, extend prg brk and update metadata 
     else{
         uint64_t last_size = tag_to_size(last_tag);
         ptr = prg_break - last_size - WORD_SIZE;
-        mem_sbrk(size-last_size);
+        void *sbrk_status = mem_sbrk(size-last_size);
         //update lower size tag
+        if(sbrk_status == (void *)-1){
+            return sbrk_status;
+        }
         mem_write(ptr-WORD_SIZE, size, WORD_SIZE);
         //update upper size tag
         mem_write(prg_break-WORD_SIZE, size, WORD_SIZE);
@@ -213,9 +219,12 @@ static void *add_space(uint64_t size){
     return ptr;
 }
 
-static void add_space_root(){
+static bool add_space_root(){
     void *new_node = mem_heap_hi() + 1 + WORD_SIZE;
-    mem_sbrk(4*WORD_SIZE);
+    void *sbrk_status = mem_sbrk(4*WORD_SIZE);
+    if(sbrk_status == (void *)-1){
+        return false;
+    }
     set_next(new_node, (void *)0);
     set_prev(new_node, (void *)0);
     set_bound_tags(new_node, 2*WORD_SIZE, true);
@@ -225,23 +234,25 @@ static void add_space_root(){
     // free_node test_f = get_node(new_node);     
     // printf("\nuse me to stop exec\n");
     // FIXME
+    return false;
 }
 
 static void alloc_splice(void *ptr){
     free_node node = get_node(ptr);
-    if(node.prev_addr == 0 && node.next_addr == 0){
-        return;
-        // add_space_root();
+    
+    //node is first in free list
+    if(node.prev_addr == 0){
+        set_prev(node.next_addr, NULL);
+        set_root(node.next_addr);
     }
-    else if(node.prev_addr == 0){
-        root = node.next_addr;  
-        mem_write(root_addr, (uint64_t)node.next_addr, WORD_SIZE);
-        set_prev(node.next_addr, 0);
+    //node is last in free list
+    else if(node.next_addr == 0){
+        set_next(node.prev_addr, NULL);
     }
+    //node is floating in list
     else{
         set_next(node.prev_addr, node.next_addr);
-        if(node.next_addr != 0)
-            set_prev(node.next_addr, node.prev_addr);
+        set_prev(node.next_addr, node.prev_addr);
     }
 }
 
@@ -274,8 +285,24 @@ static void alloc(void *space, uint64_t size){
         set_next(new_node, free_space.next_addr);
         set_prev(new_node, free_space.prev_addr);
         set_bound_tags(new_node, new_node_size, true);
-        root = new_node;
-        mem_write(root_addr, (uint64_t)new_node, 8);
+        //if not only node in free list
+        if(!(free_space.prev_addr == 0 && free_space.next_addr == 0)){
+            //first node in list
+            if(free_space.prev_addr == 0){
+                set_root(new_node);
+                set_prev(free_space.next_addr, new_node);
+            }
+            //last node in list
+            else if(free_space.next_addr == 0)
+                set_next(free_space.prev_addr, NULL);
+            //floating
+            else{
+                set_next(free_space.prev_addr, new_node);
+                set_prev(free_space.next_addr, new_node);
+            }
+        }
+        else
+            set_root(new_node);
     }
     set_bound_tags(space, size, false);
 }
@@ -299,18 +326,18 @@ static void print_node_list(){
 static void print_blocks(char *func, int count, uint64_t c_size){
     log_fp = fopen("debug_log.txt", "a+");
     void *cur_ptr = mem_heap_lo() + 8;
-    void *ptr = root;
-    void *nodes[100];
-    uint8_t f_nodes_count = 0;
+    // void *ptr = root;
+    // void *nodes[100];
+    // uint8_t f_nodes_count = 0;
 
     //make a list of free nodes by traversing list
-    while(ptr != (void *)0){
-        free_node cur_node = get_node(ptr); 
-        nodes[f_nodes_count] = ptr;
-        ptr = cur_node.next_addr;
-        f_nodes_count++;
-    }
-    
+    // while(ptr != (void *)0){
+    //     free_node cur_node = get_node(ptr); 
+    //     nodes[f_nodes_count] = ptr;
+    //     ptr = cur_node.next_addr;
+    //     f_nodes_count++;
+    // }
+
     fprintf(log_fp, "\n\n\nFUNCTION: %s COMMAND#: %d SIZE: %ld", func, count, c_size);
     fprintf(log_fp, "\nRoot read: %p, root: %p\n root_addr: %p, heap lo: %p\n", (void *)mem_read(root_addr, 8), root, root_addr, mem_heap_lo());
     //check every word to see if its a tag, if it is print metadata 
@@ -342,19 +369,19 @@ static void print_blocks(char *func, int count, uint64_t c_size){
                 }
                 fprintf(log_fp, "size: %ld\n", size);
             }
-            if(open_valid){ 
-                bool is_in_list = false;
-                void *node_ptr = cur_ptr + WORD_SIZE; 
-                for(int i = 0; i < 100; i++){
-                    if(node_ptr == nodes[i]){
-                        is_in_list = true;
-                        break;
-                    }
-                }
-                if(!is_in_list){
-                    fprintf(log_fp, "**WARNING: NODE IS NOT IN LIST**\n");
-                }
-            }
+            // if(open_valid){ 
+            //     bool is_in_list = false;
+            //     void *node_ptr = cur_ptr + WORD_SIZE; 
+            //     for(int i = 0; i < 100; i++){
+            //         if(node_ptr == nodes[i]){
+            //             is_in_list = true;
+            //             break;
+            //         }
+            //     }
+            //     if(!is_in_list){
+            //         fprintf(log_fp, "**WARNING: NODE IS NOT IN LIST**\n");
+            //     }
+            // }
             cur_ptr += size + 2*WORD_SIZE;
         }
         else
@@ -422,7 +449,7 @@ void *malloc(size_t size)
     // printf("corrected_size: %ld", corrected_size);
     //print_node_list();
     //printf("\nuse me to stop exec\n");
-    print_blocks("malloc",command_count, corrected_size);
+    // print_blocks("malloc",command_count, corrected_size);
     //FIXME
     return space;
 }
@@ -488,7 +515,7 @@ void free(void *ptr)
             set_next(new_addr,NULL);
 		    set_prev(new_addr,NULL);
         }
-        //prev and next blocks are adjacent in list
+        //prev and next blocks are adjacent in free list
         else if(prev_node.next_addr == next_node.cur_addr || prev_node.prev_addr == next_node.cur_addr){
             //next node is last in list
             if(!next_node.next_addr){
@@ -639,7 +666,7 @@ void free(void *ptr)
 
 
     //FIXME
-    print_blocks("free",command_count, fnode.size);   
+    // print_blocks("free",command_count, fnode.size);   
     //FIXME
 }
 
@@ -660,7 +687,7 @@ void *realloc(void *oldptr, size_t size)
         free(oldptr);
         command_count -= 1;//FIXME
         //FIXME
-        print_blocks("realloc",command_count, size);   
+        // print_blocks("realloc",command_count, size);   
         //FIXME
         return NULL;
     }
@@ -671,14 +698,14 @@ void *realloc(void *oldptr, size_t size)
         free(oldptr);
         command_count -= 1;//FIXME
         //FIXME
-        print_blocks("realloc",command_count,size);   
+        // print_blocks("realloc",command_count,size);   
         //FIXME
         return newptr;
     }
     //decrease
     else if((node.size-corrected_size)<4*node.size){ 
         //FIXME
-        print_blocks("realloc",command_count, size);   
+        // print_blocks("realloc",command_count, size);   
         //FIXME
         return oldptr;
     }
@@ -690,7 +717,7 @@ void *realloc(void *oldptr, size_t size)
         free(free_ptr);
         command_count -= 1;//FIXME
         //FIXME
-        print_blocks("realloc",command_count, size);   
+        // print_blocks("realloc",command_count, size);   
         //FIXME
         return oldptr;
     }
@@ -742,7 +769,92 @@ bool mm_checkheap(int lineno)
 #ifdef DEBUG
     /* Write code to check heap invariants here */
     /* IMPLEMENT THIS */
+    void *cur_ptr = mem_heap_lo() + 8;
+    void *ptr = root;
+    void *nodes[10000];
+    bool heap_status = true;
+    uint16_t f_nodes_count = 0;
 
+    //make a list of free nodes by traversing list
+    while(ptr != (void *)0){
+        free_node cur_node = get_node(ptr); 
+        nodes[f_nodes_count] = ptr;
+        if(cur_node.next_addr > mem_heap_hi()){
+            dbg_printf("NODE %p HAS INVALID NEXT ADDR %p", cur_ptr, cur_node.next_addr);
+            return false;
+        }
+        ptr = cur_node.next_addr;
+        f_nodes_count++;
+        if(f_nodes_count > 10000){
+            dbg_printf("\nMORE THAN 10K NODES,\n INCREASE MAX NODES OR INFINITE LOOPING");
+            return false;
+        }
+    }
+
+    while(cur_ptr < mem_heap_hi() - WORD_SIZE - 1){
+        uint64_t size = tag_to_size(mem_read(cur_ptr, WORD_SIZE));
+        bool open_valid = !is_allocated(mem_read(cur_ptr, WORD_SIZE));
+        void *close_addr = cur_ptr + size + WORD_SIZE;
+        if(close_addr > mem_heap_hi()){
+            cur_ptr += WORD_SIZE;
+            continue;
+        }
+        uint64_t close_tag = tag_to_size(mem_read(close_addr, WORD_SIZE));
+        bool close_valid = !is_allocated(mem_read(close_addr, WORD_SIZE));
+        if(close_tag == size && size > 0){
+            //check if valid bits match
+            if(close_valid != open_valid){
+                dbg_printf("\n\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
+                heap_status = false;
+            }
+            //check if next and prev addr are valid
+            else if(open_valid){
+                free_node node = get_node(cur_ptr);
+                if(node.next_addr != 0){ 
+                    if(node.next_addr < mem_heap_lo() || node.next_addr > mem_heap_hi()){
+                        dbg_printf("NODE %p HAS INVALID NEXT ADDR %p", cur_ptr, node.next_addr);
+                        heap_status = false;
+                    }
+                    else{
+                        free_node next_node = get_node(node.next_addr);
+                        if(!next_node.valid){
+                            dbg_printf("NODE %p NEXT ADDR POINTS TO INVALID NODE %p", cur_ptr, node.next_addr);
+                            heap_status = false;        
+                        }
+                    }
+                }
+                if(node.prev_addr != 0){ 
+                    if(node.prev_addr < mem_heap_lo() || node.prev_addr > mem_heap_hi()){
+                        dbg_printf("NODE %p HAS INVALID PREV ADDR %p", cur_ptr, node.prev_addr);
+                        heap_status = false;
+                    }
+                    else{
+                        free_node prev_node = get_node(node.prev_addr);
+                        if(!prev_node.valid){
+                            dbg_printf("NODE %p PREV ADDR POINTS TO INVALID NODE %p", cur_ptr, node.next_addr);
+                            heap_status = false;        
+                        }
+                    }
+                }
+            }
+            //is node in list?
+            if(open_valid){ 
+                bool is_in_list = false;
+                void *node_ptr = cur_ptr + WORD_SIZE; 
+                for(int i = 0; i < 100; i++){
+                    if(node_ptr == nodes[i]){
+                        is_in_list = true;
+                        break;
+                    }
+                }
+                if(!is_in_list){
+                    dbg_printf("**WARNING: NODE %p IS NOT IN LIST**\n", node_ptr);
+                    heap_status = false;
+                }
+            }
+        }    
+    }
+    return heap_status;
 #endif /* DEBUG */
     return true;
 }
