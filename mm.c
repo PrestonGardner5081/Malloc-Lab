@@ -572,8 +572,10 @@ void free(void *ptr)
         }
         //nodes are floating randomly in list
         else{
-            free_splice(prev_node.cur_addr);
-            free_splice(next_node.cur_addr);
+            
+            alloc_splice(prev_node.cur_addr);
+            
+            alloc_splice(next_node.cur_addr);
 
             set_prev(root, new_addr);
             set_next(new_addr, root);
