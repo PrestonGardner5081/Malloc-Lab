@@ -226,7 +226,7 @@ static void add_space_root(){
     // FIXME
 }
 
-static void splice(void *ptr){
+static void alloc_splice(void *ptr){
     free_node node = get_node(ptr);
     if(node.prev_addr == 0 && node.next_addr == 0){
         return;
@@ -244,6 +244,15 @@ static void splice(void *ptr){
     }
 }
 
+//simple splice for the many cases in free
+static void free_splice(void *ptr){
+    free_node node = get_node(ptr);
+    if(node.next_addr && node.prev_addr){
+        set_prev(node.next_addr, node.prev_addr);
+        set_next(node.prev_addr, node.next_addr);
+    }
+}
+
 static void alloc(void *space, uint64_t size){
     free_node free_space = get_node(space);
     int new_node_size = free_space.size - size - 2*WORD_SIZE; 
@@ -255,7 +264,7 @@ static void alloc(void *space, uint64_t size){
     }
     //if node is not the only in the list but will be overwritten, splice it
     else if(size == free_space.size ||  new_node_size < (int)(2*WORD_SIZE)){
-        splice(space);
+        alloc_splice(space);
         size = free_space.size;
     }
     //else split node
@@ -268,32 +277,6 @@ static void alloc(void *space, uint64_t size){
         mem_write(root_addr, (uint64_t)new_node, 8);
     }
     set_bound_tags(space, size, false);
-
-    //     else if(free_space.next_addr != NULL){
-    //     }
-    //     else{
-    //         set_next(free_space.prev_addr, NULL);
-    //     }
-    //     set_bound_tags(space, size, false);
-
-    //     // // FIXME
-    //     // free_node test_a = get_node(space);     
-    //     // printf("\nuse me to stop exec\n");
-    //     // // FIXME
-    // }
-    // else{
-    //     void *new_free = space + size + 2 * WORD_SIZE;
-    //     set_next(new_free, free_space.next_addr);
-    //     set_prev(new_free, free_space.prev_addr);
-    //     set_bound_tags(space, size, false);
-    //     set_bound_tags(new_free, new_node_size, true);
-
-    //     //FIXME
-    //     // free_node test_new = get_node(new_free);
-    //     // free_node test_a = get_node(space);
-    //     // printf("\nuse me to stop exec\n");
-    //     //FIXME
-    // }
 }
 
 static void print_node_list(){
@@ -312,107 +295,73 @@ static void print_node_list(){
     }
 }
 
-
-// static void mem_traverse(char *func, int count){
-//     void *cur_ptr = mem_heap_lo() + 8;
-//     while(cur_ptr < mem_heap_hi()){
-//         uint64_t open_tag = mem_read(cur_ptr, WORD_SIZE);
-//         uint64_t size = tag_to_size(open_tag);
-//         bool open_valid = !is_allocated(open_tag);
-
-//         void *close_addr = cur_ptr + size + WORD_SIZE;
-//         if(close_addr > mem_heap_hi()){
-//             printf("\nThe current boundary tag is invalid\n and extends past the prg brk: %p\n", cur_ptr);
-//             printf("%s, %d", func, count);
-//             return;
-//         }
-//         uint64_t close_tag = mem_read(close_addr, WORD_SIZE);
-//         uint64_t close_tag_size = tag_to_size(close_tag);
-//         bool close_valid = !is_allocated(close_tag);
-//         if(size != close_tag_size){
-//             printf("\nThe current boundary tag is invalid\n and does not equal its closing tag: %p\n", cur_ptr);
-//             printf("open tag: %p = %ld\n", cur_ptr, open_tag);
-//             printf("closing tag: %p = %ld\n", close_addr, close_tag);
-//             printf("%s, %d", func, count);
-//             return;
-//         }
-//         if(open_valid != close_valid){
-//             printf("\nThe current boundary tag is invalid\n and does not have the same validity\n as its closing tag: %p\n", cur_ptr);
-//             printf("open tag: %p = %ld\n", cur_ptr, open_tag);
-//             printf("closing tag: %p = %ld\n", close_addr, close_tag);
-//             printf("%s, %d\n", func, count);
-//         }
-//         cur_ptr = close_addr + WORD_SIZE;
-//     }
-// }
-
 static void print_blocks(char *func, int count, uint64_t c_size){
-    log_fp = fopen("debug_log.txt", "a+");
-    void *cur_ptr = mem_heap_lo() + 8;
-    void *ptr = root;
-    void *nodes[100];
-    uint8_t f_nodes_count = 0;
+    // log_fp = fopen("debug_log.txt", "a+");
+    // void *cur_ptr = mem_heap_lo() + 8;
+    // void *ptr = root;
+    // void *nodes[100];
+    // uint8_t f_nodes_count = 0;
 
-    //make a list of free nodes by traversing list
-    while(ptr != (void *)0){
-        free_node cur_node = get_node(ptr); 
-        nodes[f_nodes_count] = ptr;
-        ptr = cur_node.next_addr;
-        f_nodes_count++;
-    }
+    // //make a list of free nodes by traversing list
+    // while(ptr != (void *)0){
+    //     free_node cur_node = get_node(ptr); 
+    //     nodes[f_nodes_count] = ptr;
+    //     ptr = cur_node.next_addr;
+    //     f_nodes_count++;
+    // }
     
-    fprintf(log_fp, "\n\n\nFUNCTION: %s COMMAND#: %d SIZE: %ld", func, count, c_size);
-    fprintf(log_fp, "\nRoot read: %p, root: %p\n root_addr: %p, heap lo: %p\n", (void *)mem_read(root_addr, 8), root, root_addr, mem_heap_lo());
-    //check every word to see if its a tag, if it is print metadata 
-    while(cur_ptr < mem_heap_hi() - WORD_SIZE - 1){
-        uint64_t size = tag_to_size(mem_read(cur_ptr, WORD_SIZE));
-        bool open_valid = !is_allocated(mem_read(cur_ptr, WORD_SIZE));
-        void *close_addr = cur_ptr + size + WORD_SIZE;
-        if(close_addr > mem_heap_hi()){
-            cur_ptr += WORD_SIZE;
-            continue;
-        }
-        uint64_t close_tag = tag_to_size(mem_read(close_addr, WORD_SIZE));
-        bool close_valid = !is_allocated(mem_read(close_addr, WORD_SIZE));
-        if(close_tag == size){
-            if(close_valid != open_valid){
-                fprintf(log_fp, "\n\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
-                fprintf(log_fp, "size: %ld\n", size);
-            }
-            else{
-                fprintf(log_fp, "\nFound block at %p\n free?: %d\n", cur_ptr + WORD_SIZE, open_valid);
-                if(open_valid){
-                    free_node node = get_node(cur_ptr + WORD_SIZE);
-                    fprintf(log_fp, "next: %p\n", node.next_addr);
-                    if(node.next_addr != 0 && (mem_heap_hi() < node.next_addr || node.next_addr < mem_heap_lo()))
-                        fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
-                    fprintf(log_fp, "prev: %p\n", node.prev_addr);
-                    if(node.prev_addr != 0 && (mem_heap_hi() < node.prev_addr || node.prev_addr < mem_heap_lo()))
-                        fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n"); 
-                }
-                fprintf(log_fp, "size: %ld\n", size);
-            }
-            if(open_valid){ 
-                bool is_in_list = false;
-                void *node_ptr = cur_ptr + WORD_SIZE; 
-                for(int i = 0; i < 100; i++){
-                    if(node_ptr == nodes[i]){
-                        is_in_list = true;
-                        break;
-                    }
-                }
-                if(!is_in_list){
-                    fprintf(log_fp, "**WARNING: NODE IS NOT IN LIST**\n");
-                }
-            }
-            cur_ptr += size + 2*WORD_SIZE;
-        }
-        else
-            cur_ptr += WORD_SIZE;
-    }
-    fprintf(log_fp, "PRG BRK %p\n", mem_heap_hi() + 1);
-    fprintf(log_fp, "END TRAVERSE COMMAND#: %d FUNCTION: %s SIZE: %ld", count, func, c_size);
-    fclose(log_fp);
+    // fprintf(log_fp, "\n\n\nFUNCTION: %s COMMAND#: %d SIZE: %ld", func, count, c_size);
+    // fprintf(log_fp, "\nRoot read: %p, root: %p\n root_addr: %p, heap lo: %p\n", (void *)mem_read(root_addr, 8), root, root_addr, mem_heap_lo());
+    // //check every word to see if its a tag, if it is print metadata 
+    // while(cur_ptr < mem_heap_hi() - WORD_SIZE - 1){
+    //     uint64_t size = tag_to_size(mem_read(cur_ptr, WORD_SIZE));
+    //     bool open_valid = !is_allocated(mem_read(cur_ptr, WORD_SIZE));
+    //     void *close_addr = cur_ptr + size + WORD_SIZE;
+    //     if(close_addr > mem_heap_hi()){
+    //         cur_ptr += WORD_SIZE;
+    //         continue;
+    //     }
+    //     uint64_t close_tag = tag_to_size(mem_read(close_addr, WORD_SIZE));
+    //     bool close_valid = !is_allocated(mem_read(close_addr, WORD_SIZE));
+    //     if(close_tag == size){
+    //         if(close_valid != open_valid){
+    //             fprintf(log_fp, "\n\nFound block at %p\n but the valid bit does not match", cur_ptr + WORD_SIZE);
+    //             fprintf(log_fp, "size: %ld\n", size);
+    //         }
+    //         else{
+    //             fprintf(log_fp, "\nFound block at %p\n free?: %d\n", cur_ptr + WORD_SIZE, open_valid);
+    //             if(open_valid){
+    //                 free_node node = get_node(cur_ptr + WORD_SIZE);
+    //                 fprintf(log_fp, "next: %p\n", node.next_addr);
+    //                 if(node.next_addr != 0 && (mem_heap_hi() < node.next_addr || node.next_addr < mem_heap_lo()))
+    //                     fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n");
+    //                 fprintf(log_fp, "prev: %p\n", node.prev_addr);
+    //                 if(node.prev_addr != 0 && (mem_heap_hi() < node.prev_addr || node.prev_addr < mem_heap_lo()))
+    //                     fprintf(log_fp, "**WARNING: ADDR OUT OF BOUNDS**\n"); 
+    //             }
+    //             fprintf(log_fp, "size: %ld\n", size);
+    //         }
+    //         if(open_valid){ 
+    //             bool is_in_list = false;
+    //             void *node_ptr = cur_ptr + WORD_SIZE; 
+    //             for(int i = 0; i < 100; i++){
+    //                 if(node_ptr == nodes[i]){
+    //                     is_in_list = true;
+    //                     break;
+    //                 }
+    //             }
+    //             if(!is_in_list){
+    //                 fprintf(log_fp, "**WARNING: NODE IS NOT IN LIST**\n");
+    //             }
+    //         }
+    //         cur_ptr += size + 2*WORD_SIZE;
+    //     }
+    //     else
+    //         cur_ptr += WORD_SIZE;
+    // }
+    // fprintf(log_fp, "PRG BRK %p\n", mem_heap_hi() + 1);
+    // fprintf(log_fp, "END TRAVERSE COMMAND#: %d FUNCTION: %s SIZE: %ld", count, func, c_size);
+    // fclose(log_fp);
 }
 
 /*
@@ -450,7 +399,7 @@ bool mm_init(void)
 void *malloc(size_t size)
 {
     command_count += 1; //FIXME
-    printf("\n%d\n", command_count);
+    // printf("\n%d\n", command_count);
     /* IMPLEMENT THIS */
     if(size == 0){
         return NULL; 
@@ -489,7 +438,7 @@ static bool validate_size(uint64_t size){
 void free(void *ptr)
 {
     command_count++;//FIXME
-    printf("\n%d\n", command_count);
+    // printf("\n%d\n", command_count);
     if(ptr==NULL){return;}
     free_node fnode = get_node(ptr);
     // free_node node_n = get_node(fnode.next_addr);
@@ -531,50 +480,92 @@ void free(void *ptr)
     //case 4
     else if (next_free && prev_free)
     {
-        //splice only if surrounding nodes are not only nodes in list
-        if((next_node.next_addr || prev_node.prev_addr) && (next_node.prev_addr || prev_node.next_addr)){
-            splice(next_node.cur_addr);
-            splice(prev_node.cur_addr);
-        }
-        else{
-            set_root(prev_node.cur_addr);
-        }
-        overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + next_node.size + 4*WORD_SIZE);
+        // void *new_addr = prev_node.cur_addr;
+        // //splice only if surrounding nodes are not only nodes in list
+        // // if((next_node.next_addr || prev_node.prev_addr) && (next_node.prev_addr || prev_node.next_addr)){
+        // //     free_splice(next_node.cur_addr);
+        // //     free_splice(prev_node.cur_addr);
+        // // }
+        // // else{
+        // //     set_root(prev_node.cur_addr);
+        // // }
+        // set_bound_tags(new_addr ,fnode.size + prev_node.size + next_node.size + 4*WORD_SIZE, true);
     }
     //case 2
     else if (next_free)
     {
-        set_bound_tags(ptr, fnode.size + next_node.size + 2*WORD_SIZE, true);
-        if(root != next_node.cur_addr){
-            splice(next_node.cur_addr);    
-            set_prev(root, ptr);
-            set_next(ptr, root);
-            set_root(ptr);
+        void *new_addr = ptr;
+        //next node is only node, only resize and move data to ptr
+        if(!next_node.next_addr && !next_node.prev_addr){
+            set_root(new_addr);
+            set_next(new_addr,NULL);
+		    set_prev(new_addr,NULL);
+        }
+        //next node is first node
+        else if(!next_node.prev_addr){
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        //next node is last node
+        else if(!next_node.next_addr){
+            set_next(next_node.prev_addr, NULL);
+
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
         }
         else{
-            set_next(ptr, next_node.next_addr);
-            set_prev(ptr, NULL);
-        }   
+            free_splice(next_node.cur_addr);
+
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+
+        set_bound_tags(new_addr, fnode.size + next_node.size + 2*WORD_SIZE, true);
     }
     //case 3
     else if (prev_free)
     {
-        /*
-        if root is prev, prev is first in list
-        which means we keep all values and overwrite node with new size
-        */
-        if(root != prev_node.cur_addr){
-            splice(prev_node.cur_addr);    
-            set_prev(root, prev_node.cur_addr);
-            set_next(prev_node.cur_addr, root);
-            set_root(prev_node.cur_addr);
-        }   
+        void *new_addr = prev_node.cur_addr;
+
+        //if prev is only node in list simply resize, mode to beginning of list
+        if(!prev_node.next_addr && !prev_node.prev_addr){
+            set_root(new_addr);
+            set_next(new_addr, NULL);//FIXME?
+            set_prev(new_addr, NULL);//FIXME?
+        }
+        else if(!prev_node.prev_addr){
+
+        }
+        //prev node is last node: remove from end of list, resize, move to beginning of list
+        else if(!prev_node.next_addr){
+            //remove from end of list
+            set_next(prev_node.prev_addr, NULL);
+            
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        //otherwise splice the node out, resize, move to beginning of list
+        else{
+            free_splice(prev_node.cur_addr);
+
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
         set_bound_tags(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE, true);
-        // overwrite_node(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE);
     }
     //case 1
     else
-        add_node(ptr, fnode.size);
+        // add_node(ptr, fnode.size);
 
     //FIXME
     print_blocks("free",command_count, fnode.size);   
