@@ -473,205 +473,203 @@ static bool validate_size(uint64_t size){
  */
 void free(void *ptr)
 {
-    // command_count++;//FIXME
-    // // printf("\n%d\n", command_count);
-    // if(ptr==NULL){return;}
-    // free_node fnode = get_node(ptr);
-    // // free_node node_n = get_node(fnode.next_addr);
-    // // free_node node_p = get_node(fnode.prev_addr);
-    // bool next_free;
-    // free_node next_node = {NULL, NULL, NULL, 0, false};
-    // free_node prev_node = {NULL, NULL, NULL, 0, false};
-    // //check if next block is prg break
-    // if((ptr + fnode.size + WORD_SIZE + WORD_SIZE) < mem_heap_hi()){
-    //     if(validate_size(mem_read(ptr + fnode.size + WORD_SIZE, WORD_SIZE))){
-    //         next_node = get_node(ptr + fnode.size + 2*WORD_SIZE); 
-    //         next_free = next_node.valid;
-    //     }
-    //     else
-    //         next_free = false;
-    // }
-    // else
-    //     next_free = false;
+    command_count++;//FIXME
+    // printf("\n%d\n", command_count);
+    if(ptr==NULL){return;}
+    free_node fnode = get_node(ptr);
+    bool next_free;
+    free_node next_node = {NULL, NULL, NULL, 0, false};
+    free_node prev_node = {NULL, NULL, NULL, 0, false};
+    //check if next block is prg break
+    if((ptr + fnode.size + WORD_SIZE + WORD_SIZE) < mem_heap_hi()){
+        if(validate_size(mem_read(ptr + fnode.size + WORD_SIZE, WORD_SIZE))){
+            next_node = get_node(ptr + fnode.size + 2*WORD_SIZE); 
+            next_free = next_node.valid;
+        }
+        else
+            next_free = false;
+    }
+    else
+        next_free = false;
 
-    // //check if prev block is root
-    // bool prev_free;
-    // if(ptr - 2 * WORD_SIZE > root_addr){
-    //     void *bound_tag = ptr - 2 * WORD_SIZE;
-    //     uint64_t prev_size = tag_to_size(mem_read(bound_tag, WORD_SIZE));
-    //     if(validate_size(prev_size)){
-    //         prev_node = get_node(bound_tag - prev_size);
-    //         prev_free = prev_node.valid;    
-    //     }   
-    //     else
-    //         prev_free = false;
-    // }
-    // else
-    //     prev_free = false;
+    //check if prev block is root
+    bool prev_free;
+    if(ptr - 2 * WORD_SIZE > root_addr){
+        void *bound_tag = ptr - 2 * WORD_SIZE;
+        uint64_t prev_size = tag_to_size(mem_read(bound_tag, WORD_SIZE));
+        if(validate_size(prev_size)){
+            prev_node = get_node(bound_tag - prev_size);
+            prev_free = prev_node.valid;    
+        }   
+        else
+            prev_free = false;
+    }
+    else
+        prev_free = false;
 
-    // if (fnode.valid)
-    // {
-    //     return;
-    // }
-    // //case 4
-    // else if (next_free && prev_free)
-    // {
-    //     void *new_addr = prev_node.cur_addr;
-    //     //prev and next blocks are only nodes in list
-    //     if((!next_node.next_addr && !prev_node.prev_addr) || (!next_node.prev_addr && !prev_node.next_addr)){
-    //         set_root(new_addr);
-    //         set_next(new_addr,NULL);
-	// 	    set_prev(new_addr,NULL);
-    //     }
-    //     //prev and next blocks are adjacent in free list
-    //     else if(prev_node.next_addr == next_node.cur_addr || prev_node.prev_addr == next_node.cur_addr){
-    //         //next node is last in list
-    //         if(!next_node.next_addr){
-    //             set_next(prev_node.prev_addr, NULL);
+    if (fnode.valid)
+    {
+        return;
+    }
+    // case 4
+    else if (next_free && prev_free)
+    {
+        void *new_addr = prev_node.cur_addr;
+        //prev and next blocks are only nodes in list
+        if((!next_node.next_addr && !prev_node.prev_addr) || (!next_node.prev_addr && !prev_node.next_addr)){
+            set_root(new_addr);
+            set_next(new_addr,NULL);
+		    set_prev(new_addr,NULL);
+        }
+        //prev and next blocks are adjacent in free list
+        else if(prev_node.next_addr == next_node.cur_addr || prev_node.prev_addr == next_node.cur_addr){
+            //next node is last in list
+            if(!next_node.next_addr){
+                set_next(prev_node.prev_addr, NULL);
 
-    //             set_prev(root, new_addr);
-    //             set_next(new_addr, root);
-    //             set_prev(new_addr,NULL);
-    //             set_root(new_addr);
-    //         }
-    //         //prev node last in list
-    //         else if(!prev_node.next_addr){
-    //             set_next(next_node.prev_addr, NULL);
+                set_prev(root, new_addr);
+                set_next(new_addr, root);
+                set_prev(new_addr,NULL);
+                set_root(new_addr);
+            }
+            //prev node last in list
+            else if(!prev_node.next_addr){
+                set_next(next_node.prev_addr, NULL);
 
-    //             set_prev(root, new_addr);
-    //             set_next(new_addr, root);
-    //             set_prev(new_addr,NULL);
-    //             set_root(new_addr);
-    //         }
-    //         //next node is first in list
-    //         else if(!next_node.prev_addr){
-    //             set_root(new_addr);
-    //             set_prev(new_addr,NULL);
-    //         }
-    //         //prev node is first in list
-    //         else if(!prev_node.prev_addr){
-    //             set_prev(next_node.next_addr, new_addr);
-    //             set_next(new_addr, next_node.next_addr);
-    //             set_prev(new_addr, NULL);
-    //         }
-    //         else{
-    //             //... -> next -> prev -> ... 
-    //             if(prev_node.prev_addr == next_node.cur_addr){
-    //                 set_next(next_node.prev_addr, prev_node.next_addr);
-    //                 set_prev(prev_node.next_addr, next_node.prev_addr);
+                set_prev(root, new_addr);
+                set_next(new_addr, root);
+                set_prev(new_addr,NULL);
+                set_root(new_addr);
+            }
+            //next node is first in list
+            else if(!next_node.prev_addr){
+                set_root(new_addr);
+                set_prev(new_addr,NULL);
+            }
+            //prev node is first in list
+            else if(!prev_node.prev_addr){
+                set_prev(next_node.next_addr, new_addr);
+                set_next(new_addr, next_node.next_addr);
+                set_prev(new_addr, NULL);
+            }
+            else{
+                //... -> next -> prev -> ... 
+                if(prev_node.prev_addr == next_node.cur_addr){
+                    set_next(next_node.prev_addr, prev_node.next_addr);
+                    set_prev(prev_node.next_addr, next_node.prev_addr);
                     
-    //                 set_prev(root, new_addr);
-    //                 set_next(new_addr, root);
-    //                 set_prev(new_addr,NULL);
-    //                 set_root(new_addr);
-    //             }
-    //             //... -> prev -> next -> ... 
-    //             else if(prev_node.next_addr == next_node.cur_addr){
-    //                 set_next(prev_node.prev_addr, next_node.next_addr);
-    //                 set_prev(next_node.next_addr, prev_node.prev_addr);
+                    set_prev(root, new_addr);
+                    set_next(new_addr, root);
+                    set_prev(new_addr,NULL);
+                    set_root(new_addr);
+                }
+                //... -> prev -> next -> ... 
+                else if(prev_node.next_addr == next_node.cur_addr){
+                    set_next(prev_node.prev_addr, next_node.next_addr);
+                    set_prev(next_node.next_addr, prev_node.prev_addr);
                    
-    //                 set_prev(root, new_addr);
-    //                 set_next(new_addr, root);
-    //                 set_prev(new_addr,NULL);
-    //                 set_root(new_addr);
-    //             }
-    //         }
-    //     }
-    //     //nodes are floating randomly in list
-    //     else{
+                    set_prev(root, new_addr);
+                    set_next(new_addr, root);
+                    set_prev(new_addr,NULL);
+                    set_root(new_addr);
+                }
+            }
+        }
+        //nodes are floating randomly in list
+        else{
             
-    //         alloc_splice(prev_node.cur_addr);
+            alloc_splice(prev_node.cur_addr);
             
-    //         alloc_splice(next_node.cur_addr);
+            alloc_splice(next_node.cur_addr);
 
-    //         set_prev(root, new_addr);
-    //         set_next(new_addr, root);
-    //         set_prev(new_addr,NULL);
-    //         set_root(new_addr);
-    //     }
-    //     set_bound_tags(new_addr, fnode.size + next_node.size + prev_node.size + 4*WORD_SIZE, true);
-    // }
-    // //case 2
-    // else if (next_free)
-    // {
-    //     // void *new_addr = ptr;
-    //     // //next node is only node, only resize and move data to ptr
-    //     // if(!next_node.next_addr && !next_node.prev_addr){
-    //     //     set_root(new_addr);
-    //     //     set_next(new_addr,NULL);
-	// 	//     set_prev(new_addr,NULL);
-    //     // }
-    //     // //next node is first node
-    //     // else if(!next_node.prev_addr){
-    //     //     set_prev(root, new_addr);
-    //     //     set_next(new_addr, next_node.next_addr);
-    //     //     set_prev(new_addr,NULL);
-    //     //     set_root(new_addr);
-    //     // }
-    //     // //next node is last node
-    //     // else if(!next_node.next_addr){
-    //     //     set_next(next_node.prev_addr, NULL);
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        set_bound_tags(new_addr, fnode.size + next_node.size + prev_node.size + 4*WORD_SIZE, true);
+    }
+    //case 2
+    else if (next_free)
+    {
+        void *new_addr = ptr;
+        //next node is only node, only resize and move data to ptr
+        if(!next_node.next_addr && !next_node.prev_addr){
+            set_root(new_addr);
+            set_next(new_addr,NULL);
+		    set_prev(new_addr,NULL);
+        }
+        //next node is first node
+        else if(!next_node.prev_addr){
+            set_prev(root, new_addr);
+            set_next(new_addr, next_node.next_addr);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        //next node is last node
+        else if(!next_node.next_addr){
+            set_next(next_node.prev_addr, NULL);
 
-    //     //     set_prev(root, new_addr);
-    //     //     set_next(new_addr, root);
-    //     //     set_prev(new_addr,NULL);
-    //     //     set_root(new_addr);
-    //     // }
-    //     // else{
-    //     //     free_splice(next_node.cur_addr);
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        else{
+            free_splice(next_node.cur_addr);
 
-    //     //     set_prev(root, new_addr);
-    //     //     set_next(new_addr, root);
-    //     //     set_prev(new_addr,NULL);
-    //     //     set_root(new_addr);
-    //     // }
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
 
-    //     // set_bound_tags(new_addr, fnode.size + next_node.size + 2*WORD_SIZE, true);
-    // }
-    // //case 3
-    // else if (prev_free)
-    // {
-    //     // void *new_addr = prev_node.cur_addr;
+        set_bound_tags(new_addr, fnode.size + next_node.size + 2*WORD_SIZE, true);
+    }
+    //case 3
+    else if (prev_free)
+    {
+        void *new_addr = prev_node.cur_addr;
 
-    //     // //if prev is only node in list simply resize, mode to beginning of list
-    //     // if(!prev_node.next_addr && !prev_node.prev_addr){
-    //     //     set_root(new_addr);
-    //     //     set_next(new_addr, NULL);//FIXME?
-    //     //     set_prev(new_addr, NULL);//FIXME?
-    //     // }
-    //     // //prev_node is first in list
-    //     // else if(!prev_node.prev_addr){
+        //if prev is only node in list simply resize, mode to beginning of list
+        if(!prev_node.next_addr && !prev_node.prev_addr){
+            set_root(new_addr);
+            set_next(new_addr, NULL);//FIXME?
+            set_prev(new_addr, NULL);//FIXME?
+        }
+        //prev_node is first in list
+        else if(!prev_node.prev_addr){
 
-    //     // }
-    //     // //prev node is last node: remove from end of list, resize, move to beginning of list
-    //     // else if(!prev_node.next_addr){
-    //     //     //remove from end of list
-    //     //     set_next(prev_node.prev_addr, NULL);
+        }
+        //prev node is last node: remove from end of list, resize, move to beginning of list
+        else if(!prev_node.next_addr){
+            //remove from end of list
+            set_next(prev_node.prev_addr, NULL);
             
-    //     //     set_prev(root, new_addr);
-    //     //     set_next(new_addr, root);
-    //     //     set_prev(new_addr,NULL);
-    //     //     set_root(new_addr);
-    //     // }
-    //     // //otherwise splice the node out, resize, move to beginning of list
-    //     // else{
-    //     //     free_splice(prev_node.cur_addr);
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        //otherwise splice the node out, resize, move to beginning of list
+        else{
+            free_splice(prev_node.cur_addr);
 
-    //     //     set_prev(root, new_addr);
-    //     //     set_next(new_addr, root);
-    //     //     set_prev(new_addr,NULL);
-    //     //     set_root(new_addr);
-    //     // }
-    //     // set_bound_tags(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE, true);
-    // }
-    // //case 1
-    // else{
-    //     set_prev(root, ptr);
-    //     set_next(ptr, root);
-    //     set_prev(ptr,NULL);
-    //     set_root(ptr);
-    //     set_bound_tags(ptr, fnode.size, true);
-    // }
+            set_prev(root, new_addr);
+            set_next(new_addr, root);
+            set_prev(new_addr,NULL);
+            set_root(new_addr);
+        }
+        set_bound_tags(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE, true);
+    }
+    //case 1
+    else{
+        set_prev(root, ptr);
+        set_next(ptr, root);
+        set_prev(ptr,NULL);
+        set_root(ptr);
+        set_bound_tags(ptr, fnode.size, true);
+    }
 
 
     //FIXME
@@ -693,7 +691,7 @@ void *realloc(void *oldptr, size_t size)
         return malloc(corrected_size);
     }
     if(corrected_size==0 ){
-        free(oldptr);
+        // free(oldptr);
         command_count -= 1;//FIXME
         //FIXME
         // print_blocks("realloc",command_count, size);   
@@ -704,7 +702,7 @@ void *realloc(void *oldptr, size_t size)
     if(node.size< corrected_size){
         void *newptr=malloc(corrected_size);
         memcpy(newptr,oldptr,node.size);
-        free(oldptr);
+        // free(oldptr);
         command_count -= 1;//FIXME
         //FIXME
         // print_blocks("realloc",command_count,size);   
@@ -723,7 +721,7 @@ void *realloc(void *oldptr, size_t size)
         void* free_ptr=(oldptr+corrected_size+2*WORD_SIZE);
         set_bound_tags(free_ptr,free_size,true);
         set_bound_tags(oldptr, corrected_size, false);
-        free(free_ptr);
+        // free(free_ptr);
         command_count -= 1;//FIXME
         //FIXME
         // print_blocks("realloc",command_count, size);   
