@@ -588,6 +588,7 @@ void free(void *ptr)
             set_root(new_addr);
         }
         set_bound_tags(new_addr, fnode.size + next_node.size + prev_node.size + 4*WORD_SIZE, true);
+        return;
     }
     //case 2
     else if (next_free)
@@ -625,6 +626,7 @@ void free(void *ptr)
         }
 
         set_bound_tags(new_addr, fnode.size + next_node.size + 2*WORD_SIZE, true);
+        return;
     }
     //case 3
     else if (prev_free)
@@ -661,15 +663,14 @@ void free(void *ptr)
             set_root(new_addr);
         }
         set_bound_tags(prev_node.cur_addr, fnode.size + prev_node.size + 2*WORD_SIZE, true);
+        return;
     }
     //case 1
-    else{
-        set_prev(root, ptr);
-        set_next(ptr, root);
-        set_prev(ptr,NULL);
-        set_root(ptr);
-        set_bound_tags(ptr, fnode.size, true);
-    }
+    set_prev(root, ptr);
+    set_next(ptr, root);
+    set_prev(ptr,NULL);
+    set_root(ptr);
+    set_bound_tags(ptr, fnode.size, true);
 
 
     //FIXME
