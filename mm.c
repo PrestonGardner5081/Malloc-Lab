@@ -712,7 +712,7 @@ void *realloc(void *oldptr, size_t size)
         return newptr;
     }
     //decrease
-    else if((node.size-corrected_size)<4*node.size){ 
+    else if((node.size-corrected_size)<4*WORD_SIZE){ 
         //FIXME
         // print_blocks("realloc",command_count, size);   
         //FIXME
