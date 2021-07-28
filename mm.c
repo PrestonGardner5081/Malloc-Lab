@@ -602,6 +602,8 @@ void free(void *ptr)
         }
         //next node is first node
         else if(!next_node.prev_addr){
+            set_prev(next_node.next_addr, new_addr);
+
             set_prev(root, new_addr);
             set_next(new_addr, next_node.next_addr);
             set_prev(new_addr,NULL);
