@@ -80,11 +80,13 @@ static size_t align(size_t x)
 {
     return ALIGNMENT * ((x + ALIGNMENT - 1) / ALIGNMENT);
 }
+
 //passes a boundary tag and returns the size i.e removes masked bit
 static uint64_t tag_to_size(uint64_t bound_tag)
 {
     return bound_tag & -2;
 }
+
 //passes a boundary tag and returns the TRUE if it is allocated and FALSE if its free 
 static bool is_allocated(uint64_t bound_tag)
 {
@@ -190,7 +192,6 @@ static void *add_space(uint64_t size){
     void *prg_break = mem_heap_hi() + 1;
     uint64_t last_tag = mem_read(prg_break - WORD_SIZE, WORD_SIZE);
 
-    // printf("WORD_SIZE: %ld\n", WORD_SIZE);
     //last block is allocated, add new free node at end of heap
     if(is_allocated(last_tag)){
         ptr = prg_break + WORD_SIZE;
@@ -327,7 +328,6 @@ static void print_node_list(){
  */
 bool mm_init(void)
 {
-    /* IMPLEMENT THIS */
     // adds enough space for root and one free block of size 2 * word size
     mem_sbrk(WORD_SIZE);
 
@@ -344,7 +344,6 @@ bool mm_init(void)
  */
 void *malloc(size_t size)
 {
-    /* IMPLEMENT THIS */
     if(size == 0){
         return NULL; 
     }
@@ -647,7 +646,6 @@ bool mm_checkheap(int lineno)
 {
 #ifdef DEBUG
     /* Write code to check heap invariants here */
-    /* IMPLEMENT THIS */
     void *cur_ptr = mem_heap_lo() + 8;
     void *ptr = root;
     void *nodes[10000];

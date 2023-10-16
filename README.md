@@ -16,8 +16,7 @@ This list of free nodes is a doubly linked list and each free node that we kept 
 
 For the purpose of reusability and ease of access while debugging, we define multiple helper functions like alloc(), getnode(), tag_to_size(). We call these functions multiple times throughout our code, for example the most useful helper functions is getnode()- accepts the pointer pointing to the current node and returns the size, next address, previous address and if the node was free or allocated.
 
-
-Malloc()-  This function allocates unused space for objects whose size in bytes is passed but the actual data is unknown. We find the needed space by traversing through the list and find a space that can fit the data of specified bytes. A helper function alloc() is called in malloc() which  walks through a variety of conditions to keep the free list intact also helps change the free block state by updating its metadata.
+Malloc()-  This function allocates unused memory for objects whose size in bytes is passed but the actual data is unknown. We find the needed space by traversing through the list and find a space that can fit the data of specified bytes. A helper function alloc() is called in malloc() which  walks through a variety of conditions to keep the free list intact also helps change the free block state by updating its metadata.
 
 Free()-  function in our project deallocates a block of memory previously allocated using calloc, malloc or realloc functions, making it available for further allocations. This function starts off by checking the validity of the pointer that is passed and if it exists inside the heap, if those conditions satisfy, we proceed to run the four cases which would help determine the way splice and coalesce would work on the freed blocks. The four cases are as follows-
 Inserting a new node at the beginning of the list
