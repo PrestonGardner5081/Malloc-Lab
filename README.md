@@ -29,7 +29,7 @@ Realloc() – this function changes the size of the allocated memory, it covers 
 Checkheap()- In this heaper checker we traverse through the list to get all the accessible nodes and then we traverse through the entire heap looking for blocks ( allocated or free) and for each block found we check if the valid bits match the status of the node. For every free node we check if the pointers pointing to the previous and next nodes are also free. If the node is free check if it exists in the heap and if we have the data to access/ modify it.
 
 ### Issues that we faced 
-Even after passing the first checkpoint our code went through major changes as we tried to go through all the tracefiles. The biggest curve we faced was trying to understand the multiple cases in coalescing. Even with the heap checker the extensive trace cases made is cumbersome to point exactly where the program had a segmentation fault before we considered these edge cases. 
+Even after passing the first checkpoint our code went through major changes as we tried to go through all the tracefiles. The biggest curve we faced was trying to understand the multiple cases in coalescing. Even with the heap checker the extensive trace cases made is cumbersome to point exactly where the program had a segmentation fault before we considered these edge cases. We likely could have more effieciently written and debugged this code if we had made use of structures for our linked list instead of reading and writing directly to memory. 
 
 
 
