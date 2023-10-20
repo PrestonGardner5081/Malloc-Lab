@@ -70,7 +70,7 @@
             "name": "launch PA2",
             "type": "cppdbg",
             "request": "launch",
-            "program": "/home/ptg5081/CMPSC-473/projects/PA2/mdriver",
+            "program": "${workspaceFolder}/mdriver",
             "args": [
                 "-f",
                 "./traces/syn-array-short.rep"
