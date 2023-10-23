@@ -91,31 +91,29 @@ static bool is_allocated(uint64_t bound_tag)
     return bound_tag & 1;
 }
 
-static free_node get_node(void *ptr){
-    free_node node;
-    node.cur_addr = ptr;
+static void get_node(void *ptr, free_node* node){
+    node->cur_addr = ptr;
 
     uint64_t lower_tag = mem_read(ptr - WORD_SIZE, WORD_SIZE);
-    node.size = tag_to_size(lower_tag);
-    uint64_t upper_tag = mem_read(ptr + node.size, WORD_SIZE);
+    node->size = tag_to_size(lower_tag);
+    uint64_t upper_tag = mem_read(ptr + node->size, WORD_SIZE);
     //valid tells us if the node is a valid free node otherwise known as unallocated
-    node.valid = !is_allocated(lower_tag) && !is_allocated(upper_tag);
-    node.next_addr = (void *)mem_read(ptr, WORD_SIZE);
-    node.prev_addr = (void *)mem_read(ptr + WORD_SIZE, WORD_SIZE);
-
-    return node; 
+    node->valid = !is_allocated(lower_tag) && !is_allocated(upper_tag);
+    node->next_addr = (void *)mem_read(ptr, WORD_SIZE);
+    node->prev_addr = (void *)mem_read(ptr + WORD_SIZE, WORD_SIZE);
 }
 
 static void *find_space(uint64_t size){
     void *ptr = root;
 
     while(ptr != (void *)0){
-        free_node cur_node = get_node(ptr); 
+        free_node cur_node = {NULL, NULL, NULL, 0, false};
+        get_node(ptr, &cur_node); 
 
         if(cur_node.size >= size){
             break;
         }
-        if(ptr == cur_node.next_addr || cur_node.next_addr > mem_heap_hi()){
+        if(ptr == cur_node.next_addr || cur_node.next_addr > mem_heap_hi()){ 
             dbg_printf();
             return (void *)0;
         }
@@ -164,7 +162,8 @@ static void add_node(void *ptr, uint64_t size){
 
 static void overwrite_node(void *ptr, uint64_t size){
     set_prev(ptr, NULL);
-    free_node cur_node = get_node(ptr);
+    free_node cur_node = {NULL, NULL, NULL, 0, false};
+    get_node(ptr, &cur_node);
     
     //if the node is not last 
     if(cur_node.next_addr != 0)
@@ -232,7 +231,8 @@ static bool add_space_root(){
 }
 
 static void alloc_splice(void *ptr){
-    free_node node = get_node(ptr);
+    free_node node = {NULL, NULL, NULL, 0, false}; 
+    get_node(ptr, &node);
     
     //only node in free list
     if(node.prev_addr == 0 && node.next_addr == 0){
@@ -256,7 +256,8 @@ static void alloc_splice(void *ptr){
 
 //simple splice for the many cases in free
 static void free_splice(void *ptr){
-    free_node node = get_node(ptr);
+    free_node node = {NULL, NULL, NULL, 0, false};
+    get_node(ptr, &node);
     if(node.next_addr && node.prev_addr){
         set_prev(node.next_addr, node.prev_addr);
         set_next(node.prev_addr, node.next_addr);
@@ -264,7 +265,8 @@ static void free_splice(void *ptr){
 }
 
 static void alloc(void *space, uint64_t size){
-    free_node free_space = get_node(space);
+    free_node free_space = {NULL, NULL, NULL, 0, false};
+    get_node(space, &free_space);
     int new_node_size = free_space.size - size - 2*WORD_SIZE; 
 
     //add node if free_space is the only node and if node needs to be overwritten
@@ -310,7 +312,8 @@ static void print_node_list(){
     void *ptr = root;
 
     while(ptr != (void *)0){
-        free_node cur_node = get_node(ptr); 
+        free_node cur_node = {NULL, NULL, NULL, 0, false};
+        get_node(ptr, &cur_node); 
 
         printf("node: %p\n", cur_node.cur_addr);
         printf("size %ld\n", cur_node.size);
@@ -574,7 +577,10 @@ void free(void *ptr)
 void *realloc(void *oldptr, size_t size)
 {
     uint64_t corrected_size = (uint64_t)align(size);
-    free_node node=get_node(oldptr);
+
+    free_node node = {NULL, NULL, NULL, 0, false};
+    get_node(oldptr, &node);
+
     if(node.size==corrected_size){return oldptr;}
     if(oldptr==NULL){
         return malloc(corrected_size);
@@ -656,7 +662,8 @@ bool mm_checkheap(int lineno)
 
     //make a list of free nodes by traversing list
     while(ptr != (void *)0){
-        free_node cur_node = get_node(ptr); 
+        free_node cur_node = {NULL, NULL, NULL, 0, false};
+        get_node(ptr, &cur_node); 
         nodes[f_nodes_count] = ptr;
         if(cur_node.next_addr > mem_heap_hi()){
             dbg_printf("NODE %p HAS INVALID NEXT ADDR %p", cur_ptr, cur_node.next_addr);
@@ -688,14 +695,16 @@ bool mm_checkheap(int lineno)
             }
             //check if next and prev addr are valid
             else if(open_valid){
-                free_node node = get_node(cur_ptr);
+                free_node node = {NULL, NULL, NULL, 0, false};
+                get_node(cur_ptr, &node);
                 if(node.next_addr != 0){ 
                     if(node.next_addr < mem_heap_lo() || node.next_addr > mem_heap_hi()){
                         dbg_printf("NODE %p HAS INVALID NEXT ADDR %p", cur_ptr, node.next_addr);
                         heap_status = false;
                     }
                     else{
-                        free_node next_node = get_node(node.next_addr);
+                        free_node next_node = {NULL, NULL, NULL, 0, false};
+                        get_node(node.next_addr, &next_node);
                         if(!next_node.valid){
                             dbg_printf("NODE %p NEXT ADDR POINTS TO INVALID NODE %p", cur_ptr, node.next_addr);
                             heap_status = false;        
@@ -708,7 +717,8 @@ bool mm_checkheap(int lineno)
                         heap_status = false;
                     }
                     else{
-                        free_node prev_node = get_node(node.prev_addr);
+                        free_node prev_node = {NULL, NULL, NULL, 0, false};
+                        get_node(node.prev_addr, &prev_node);
                         if(!prev_node.valid){
                             dbg_printf("NODE %p PREV ADDR POINTS TO INVALID NODE %p", cur_ptr, node.next_addr);
                             heap_status = false;        
