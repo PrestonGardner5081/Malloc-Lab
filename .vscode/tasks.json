@@ -28,7 +28,7 @@
             "type": "shell",
             "label": "PA2 prelaunch",
             "isBackground": true,
-            "command": "cd /home/ptg5081/CMPSC-473/projects/PA2 && make debug",
+            "command": "make clean && make debug",
             "problemMatcher": [
                 {
                   "pattern": [
